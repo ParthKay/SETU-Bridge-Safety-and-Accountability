@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "project": "Zero-Trust Bridge Survival & Audit Verification Engine",
+  "status": "complete",
+  "seed": 42,
+  "n_bridges": 1203,
+  "n_generated_bridges": 1200,
+  "n_archetype_bridges": 3,
+  "runtime_seconds": 34.305465599987656,
+  "artifacts": {
+    "data": "C:\\Users\\Administrator\\AI Project\\artifacts\\data",
+    "survival_engine": "C:\\Users\\Administrator\\AI Project\\artifacts\\module2",
+    "audit_verifier": "C:\\Users\\Administrator\\AI Project\\artifacts\\module3",
+    "triage_xai": "C:\\Users\\Administrator\\AI Project\\artifacts\\module4"
+  },
+  "archetype_validation_table": [
+    {
+      "bridge_id": "ARCHETYPE-CSMT-2019",
+      "label": "Mumbai CSMT pedestrian footbridge (2019)",
+      "state": "Maharashtra",
+      "district": "Mumbai Suburban",
+      "collapse_year": 2019,
+      "event_type": "COMPOUND",
+      "event_severity": 1.2,
+      "reported_condition": 8,
+      "physics_expected_condition": 1.8831745386123657,
+      "predicted_5y_conditional_survival": 0.2092416137456894,
+      "condition_gap": 6.116825580596924,
+      "audit_z_score": 4.435487270355225,
+      "paper_inspection_suspect": true,
+      "audit_alert": true,
+      "audit_priority": "CRITICAL",
+      "baseline_rul_years": 1.4885371923446655,
+      "post_event_rul_years": 0.8111957907676697,
+      "post_disaster_rul_loss_years": 0.6773414015769958,
+      "baseline_survival_at_decision": 0.2092416137456894,
+      "post_event_survival_at_decision": 8.030641765799373e-05,
+      "triage_priority": "CRITICAL",
+      "immediate_ndt_deployment": true,
+      "top_shap_risk_driver": "STRUCTURE_KIND_MATERIAL_Steel",
+      "top_shap_risk_value": 0.5745165320010858
+    },
+    {
+      "bridge_id": "ARCHETYPE-MORBI-2022",
+      "label": "Morbi suspension bridge (2022)",
+      "state": "Gujarat",
+      "district": "Morbi",
+      "collapse_year": 2022,
+      "event_type": "COMPOUND",
+      "event_severity": 1.1,
+      "reported_condition": 8,
+      "physics_expected_condition": 9.0,
+      "predicted_5y_conditional_survival": 1.0,
+      "condition_gap": -1.0,
+      "audit_z_score": 0.14976447820663452,
+      "paper_inspection_suspect": false,
+      "audit_alert": false,
+      "audit_priority": "MEDIUM",
+      "baseline_rul_years": 0.43862056732177734,
+      "post_event_rul_years": 0.32005229592323303,
+      "post_disaster_rul_loss_years": 0.11856827884912491,
+      "baseline_survival_at_decision": 0.0009676872286945581,
+      "post_event_survival_at_decision": 7.97331913240151e-21,
+      "triage_priority": "CRITICAL",
+      "immediate_ndt_deployment": true,
+      "top_shap_risk_driver": "STRUCTURE_KIND_MATERIAL_Steel",
+      "top_shap_risk_value": 0.607962436594776
+    },
+    {
+      "bridge_id": "ARCHETYPE-BIHAR-2024",
+      "label": "Darbhanga monsoon-scour bridge (2024)",
+      "state": "Bihar",
+      "district": "Darbhanga",
+      "collapse_year": 2024,
+      "event_type": "FLOOD",
+      "event_severity": 1.45,
+      "reported_condition": 8,
+      "physics_expected_condition": 5.38326358795166,
+      "predicted_5y_conditional_survival": 0.5981404185295105,
+      "condition_gap": 2.6167361736297607,
+      "audit_z_score": 2.3277480602264404,
+      "paper_inspection_suspect": true,
+      "audit_alert": true,
+      "audit_priority": "CRITICAL",
+      "baseline_rul_years": 4.2674078941345215,
+      "post_event_rul_years": 0.48901963233947754,
+      "post_disaster_rul_loss_years": 3.778388261795044,
+      "baseline_survival_at_decision": 0.5981404185295105,
+      "post_event_survival_at_decision": 0.012185471132397652,
+      "triage_priority": "CRITICAL",
+      "immediate_ndt_deployment": true,
+      "top_shap_risk_driver": "WATERWAY_ADEQUACY",
+      "top_shap_risk_value": 0.32516334583344964
+    }
+  ],
+  "module1": {
+    "n_bridges": 1203,
+    "n_intervals": 34784,
+    "checks": {
+      "bridge_split_disjoint": true,
+      "feature_allowlist_enforced": true,
+      "counting_process_valid": true,
+      "events_only_in_final_interval": true,
+      "no_future_climate_join": true,
+      "no_missing_after_imputation": true,
+      "sksurv_targets_constructed": true,
+      "lifelines_counting_process_constructed": true
+    }
+  },
+  "module2": {
+    "selected_model": "cox_time_varying",
+    "test_metrics": {
+      "model": "cox_time_varying",
+      "n_test": 244,
+      "n_events_test": 129,
+      "event_rate_test": 0.5286885245901639,
+      "harrell_c": 0.7035473731477324,
+      "uno_ipcw_c": 0.6558573473375289,
+      "integrated_brier_score": 0.08920166006256948,
+      "brier_scores": {
+        "5": 0.0,
+        "10": 0.0,
+        "15": 0.0001186262863224558,
+        "25": 0.12774927400041278,
+        "40": 0.20324033067164712
+      },
+      "requested_horizons": [
+        5.0,
+        10.0,
+        15.0,
+        25.0,
+        40.0
+      ],
+      "evaluated_horizons": [
+        5.0,
+        10.0,
+        15.0,
+        25.0,
+        40.0
+      ]
+    }
+  },
+  "module3": {
+    "metrics": {
+      "n_evaluated": 423,
+      "n_paper_inspections": 79,
+      "paper_inspection_rate": 0.1867612293144208,
+      "PAPER_INSPECTION_SUSPECT": {
+        "precision": 0.8181818181818182,
+        "recall": 0.11392405063291139,
+        "f1": 0.2,
+        "confusion_matrix": [
+          [
+            342,
+            2
+          ],
+          [
+            70,
+            9
+          ]
+        ]
+      },
+      "AUDIT_ALERT": {
+        "precision": 0.8461538461538461,
+        "recall": 0.13924050632911392,
+        "f1": 0.2391304347826087,
+        "confusion_matrix": [
+          [
+            342,
+            2
+          ],
+          [
+            68,
+            11
+          ]
+        ]
+      },
+      "ISOLATION_FLAG": {
+        "precision": 0.2857142857142857,
+        "recall": 0.20253164556962025,
+        "f1": 0.23703703703703705,
+        "confusion_matrix": [
+          [
+            304,
+            40
+          ],
+          [
+            63,
+            16
+          ]
+        ]
+      },
+      "audit_z_score": {
+        "roc_auc": 0.8003569325875772,
+        "average_precision": 0.5189943839444741
+      },
+      "note": "Ground truth is used only for post-hoc evaluation. It never enters the survival features, residual calibration, or IsolationForest."
+    },
+    "findings": {
+      "n_reported_healthy": 129,
+      "n_paper_inspection_suspect": 11,
+      "n_audit_alert": 13,
+      "n_isolation_anomalies": 56,
+      "suspect_rate": 0.026004728132387706,
+      "alert_rate": 0.030732860520094562,
+      "priority_counts": {
+        "LOW": 355,
+        "MEDIUM": 55,
+        "CRITICAL": 11,
+        "HIGH": 2
+      }
+    },
+    "top_findings": [
+      {
+        "bridge_id": "BR-0000943",
+        "district": "Dibrugarh",
+        "age_at_audit": 30.0,
+        "reported_condition": 7,
+        "physics_expected_condition": 1.0373972654342651,
+        "expected_survival": 0.1152663603425026,
+        "condition_gap": 5.962602615356445,
+        "audit_z_score": 4.342615127563477,
+        "isolation_flag": true,
+        "paper_inspection_suspect": true,
+        "audit_alert": true,
+        "priority": "CRITICAL"
+      },
+      {
+        "bridge_id": "BR-0000489",
+        "district": "Rudraprayag",
+        "age_at_audit": 33.0,
+        "reported_condition": 7,
+        "physics_expected_condition": 1.1142562627792358,
+        "expected_survival": 0.12380624562501907,
+        "condition_gap": 5.885743618011475,
+        "audit_z_score": 4.29633092880249,
+        "isolation_flag": true,
+        "paper_inspection_suspect": true,
+        "audit_alert": true,
+        "priority": "CRITICAL"
+      },
+      {
+        "bridge_id": "BR-0000380",
+        "district": "Chamoli",
+        "age_at_audit": 43.0,
+        "reported_condition": 4,
+        "physics_expected_condition": 0.6719690561294556,
+        "expected_survival": 0.07466322928667068,
+        "condition_gap": 3.328030824661255,
+        "audit_z_score": 2.756086826324463,
+        "isolation_flag": true,
+        "paper_inspection_suspect": false,
+        "audit_alert": false,
+        "priority": "MEDIUM"
+      },
+      {
+        "bridge_id": "ARCHETYPE-CSMT-2019",
+        "district": "Mumbai Suburban",
+        "age_at_audit": 35.0,
+        "reported_condition": 8,
+        "physics_expected_condition": 1.8831745386123657,
+        "expected_survival": 0.2092416137456894,
+        "condition_gap": 6.116825580596924,
+        "audit_z_score": 4.435487270355225,
+        "isolation_flag": true,
+        "paper_inspection_suspect": true,
+        "audit_alert": true,
+        "priority": "CRITICAL"
+      },
+      {
+        "bridge_id": "BR-0000618",
+        "district": "Mumbai Suburban",
+        "age_at_audit": 31.0,
+        "reported_condition": 3,
+        "physics_expected_condition": 0.8794339299201965,
+        "expected_survival": 0.0977148786187172,
+        "condition_gap": 2.1205661296844482,
+        "audit_z_score": 2.028956413269043,
+        "isolation_flag": true,
+        "paper_inspection_suspect": false,
+        "audit_alert": false,
+        "priority": "MEDIUM"
+      }
+    ]
+  },
+  "module4": {
+    "event": {
+      "event_id": "BIHAR-MONSOON-2024",
+      "event_type": "COMPOUND",
+      "district": "Darbhanga",
+      "state": null,
+      "bridge_ids": [],
+      "severity": 1.35,
+      "monsoon_anomaly_increment": 3.0,
+      "rainfall_multiplier": 1.9,
+      "discharge_multiplier": 2.2,
+      "velocity_multiplier": 1.6,
+      "scour_multiplier": 2.4,
+      "flood_exceedance_increment": 1,
+      "cumulative_scour_increment": 15.0,
+      "event_year": null
+    },
+    "metrics": {
+      "n_scored": 10,
+      "n_immediate_ndt": 10,
+      "mean_survival_drop": 0.4923725128173828,
+      "max_survival_drop": 0.7185255885124207,
+      "mean_rul_loss_years": 9.202338218688965,
+      "max_rul_loss_years": 26.125652313232422,
+      "priority_counts": {
+        "CRITICAL": 8,
+        "HIGH": 2
+      },
+      "n_audit_escalations": 1,
+      "shap": {
+        "n_explained": 8,
+        "additivity_ok": true,
+        "max_additivity_error": 4.440892098500626e-15
+      }
+    },
+    "findings": {
+      "n_immediate_ndt": 10,
+      "n_critical": 8,
+      "n_high": 2,
+      "n_medium": 0,
+      "n_low": 0,
+      "priority_counts": {
+        "CRITICAL": 8,
+        "HIGH": 2
+      },
+      "mean_survival_drop": 0.4923725128173828,
+      "max_survival_drop": 0.7185255885124207,
+      "mean_rul_loss_years": 9.202338218688965,
+      "max_rul_loss_years": 26.125652313232422,
+      "n_audit_escalations": 1
+    },
+    "top_findings": [
+      {
+        "bridge_id": "BR-0001096",
+        "district": "Darbhanga",
+        "baseline_survival": 0.6797385811805725,
+        "post_event_survival": 0.007728232070803642,
+        "rul_baseline_years": 4.996846675872803,
+        "rul_post_event_years": 0.41479921340942383,
+        "rul_loss_years": 4.582047462463379,
+        "priority": "CRITICAL",
+        "immediate_ndt": true,
+        "audit_suspect": false
+      },
+      {
+        "bridge_id": "BR-0000700",
+        "district": "Darbhanga",
+        "baseline_survival": 0.6148366332054138,
+        "post_event_survival": 0.0005386241828091443,
+        "rul_baseline_years": 3.6627137660980225,
+        "rul_post_event_years": 0.3686186969280243,
+        "rul_loss_years": 3.294095039367676,
+        "priority": "CRITICAL",
+        "immediate_ndt": true,
+        "audit_suspect": false
+      },
+      {
+        "bridge_id": "ARCHETYPE-BIHAR-2024",
+        "district": "Darbhanga",
+        "baseline_survival": 0.5981404185295105,
+        "post_event_survival": 0.0027168290689587593,
+        "rul_baseline_years": 4.2674078941345215,
+        "rul_post_event_years": 0.4214498698711395,
+        "rul_loss_years": 3.8459579944610596,
+        "priority": "CRITICAL",
+        "immediate_ndt": true,
+        "audit_suspect": true
+      },
+      {
+        "bridge_id": "BR-0000426",
+        "district": "Darbhanga",
+        "baseline_survival": 0.8194895386695862,
+        "post_event_survival": 0.10096392035484314,
+        "rul_baseline_years": 9.101570129394531,
+        "rul_post_event_years": 0.9121723175048828,
+        "rul_loss_years": 8.189397811889648,
+        "priority": "CRITICAL",
+        "immediate_ndt": true,
+        "audit_suspect": false
+      },
+      {
+        "bridge_id": "BR-0000312",
+        "district": "Darbhanga",
+        "baseline_survival": 0.6008294224739075,
+        "post_event_survival": 2.1454363377415575e-05,
+        "rul_baseline_years": 3.6365866661071777,
+        "rul_post_event_years": 0.8036981821060181,
+        "rul_loss_years": 2.832888603210449,
+        "priority": "CRITICAL",
+        "immediate_ndt": true,
+        "audit_suspect": false
+      }
+    ],
+    "checks": {
+      "event_targets_known_bridges": true,
+      "objective_features_only": true,
+      "survival_curves_monotone": true,
+      "rul_non_negative": true,
+      "rul_loss_non_negative": true,
+      "post_event_survival_not_above_baseline": true,
+      "shap_additivity_ok": true,
+      "force_plots_written": true
+    }
+  }
+}

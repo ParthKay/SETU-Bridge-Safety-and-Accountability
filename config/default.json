@@ -1,0 +1,67 @@
+{
+  "synthetic": {
+    "n_bridges": 1200,
+    "study_end_year": 2024,
+    "min_build_year": 1950,
+    "max_build_year": 2018,
+    "paper_inspection_rate": 0.18,
+    "ndt_rate": 0.03,
+    "seed": 42
+  },
+  "pipeline": {
+    "test_size": 0.2,
+    "validation_size": 0.15,
+    "interval_width": 1.0,
+    "max_fit_rows": 50000,
+    "imputer_max_iter": 8
+  },
+  "survival": {
+    "horizons": [5.0, 10.0, 15.0, 25.0, 40.0],
+    "cox_penalizer": 0.01,
+    "rsf_n_estimators": 120,
+    "gbsa_n_estimators": 100,
+    "n_jobs": -1
+  },
+  "audit": {
+    "horizon_years": 5.0,
+    "critical_survival_threshold": 0.68,
+    "healthy_condition_min": 7,
+    "healthy_condition_max": 9,
+    "z_flag_threshold": 1.5,
+    "model_name": "cox_time_varying"
+  },
+  "triage": {
+    "event": {
+      "event_id": "BIHAR-MONSOON-2024",
+      "event_type": "COMPOUND",
+      "district": "Darbhanga",
+      "severity": 1.35,
+      "monsoon_anomaly_increment": 3.0,
+      "rainfall_multiplier": 1.9,
+      "discharge_multiplier": 2.2,
+      "velocity_multiplier": 1.6,
+      "scour_multiplier": 2.4,
+      "flood_exceedance_increment": 1,
+      "cumulative_scour_increment": 15.0
+    },
+    "config": {
+      "model_name": "cox_time_varying",
+      "explain_model_name": "ensemble",
+      "split": "test",
+      "horizons": [5.0, 10.0, 15.0, 25.0, 40.0],
+      "decision_horizon_years": 5.0,
+      "survival_threshold": 0.68,
+      "rul_threshold": 0.68,
+      "rul_horizon_years": 60.0,
+      "rul_step_years": 1.0,
+      "crisis_rul_years": 5.0,
+      "top_n_explanations": 8,
+      "shap_background_size": 100,
+      "shap_max_evals": 512,
+      "save_force_plots": true
+    }
+  },
+  "output": {
+    "root": "artifacts"
+  }
+}

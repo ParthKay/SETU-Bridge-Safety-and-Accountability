@@ -1,0 +1,1035 @@
+{
+  "schema_version": 1,
+  "module": "survival_models",
+  "config": {
+    "horizons": [
+      5.0,
+      10.0,
+      15.0,
+      25.0,
+      40.0
+    ],
+    "cox_penalizer": 0.01,
+    "cox_l1_ratio": 0.0,
+    "cox_min_variance": 1e-10,
+    "cox_correlation_threshold": 0.995,
+    "rsf_n_estimators": 120,
+    "rsf_min_samples_split": 6,
+    "rsf_min_samples_leaf": 3,
+    "rsf_max_features": "sqrt",
+    "rsf_max_depth": null,
+    "gbsa_n_estimators": 100,
+    "gbsa_learning_rate": 0.05,
+    "gbsa_max_depth": 3,
+    "gbsa_subsample": 0.8,
+    "gbsa_max_features": null,
+    "n_jobs": -1,
+    "random_state": 42,
+    "use_followup_aggregates": false,
+    "followup_aggregate_horizon": 5.0
+  },
+  "data": {
+    "splits": {
+      "train": {
+        "n_bridges": 780,
+        "n_events": 408,
+        "event_rate": 0.5230769230769231
+      },
+      "validation": {
+        "n_bridges": 179,
+        "n_events": 94,
+        "event_rate": 0.5251396648044693
+      },
+      "test": {
+        "n_bridges": 244,
+        "n_events": 129,
+        "event_rate": 0.5286885245901639
+      }
+    },
+    "n_counting_train_intervals": 22578,
+    "n_static_features": 91,
+    "n_time_varying_features": 99,
+    "followup_aggregate_columns": []
+  },
+  "cox_time_varying": {
+    "converged": true,
+    "effective_penalizer": 0.01,
+    "n_features_input": 99,
+    "n_features_selected": 89,
+    "dropped_features": {
+      "TRUCK_ADT_PCT_CURRENT": "|correlation| 0.999 > 0.995 with TRUCK_ADT_PCT",
+      "missingindicator_TRUCK_ADT_PCT_CURRENT": "|correlation| 1.000 > 0.995 with missingindicator_TRUCK_ADT_PCT",
+      "DISTRICT_Krishna": "|correlation| 1.000 > 0.995 with STATE_Andhra Pradesh",
+      "DISTRICT_Mandi": "|correlation| 1.000 > 0.995 with STATE_Himachal Pradesh",
+      "DISTRICT_Udupi": "|correlation| 1.000 > 0.995 with STATE_Karnataka",
+      "DISTRICT_Narmadapuram": "|correlation| 1.000 > 0.995 with STATE_Madhya Pradesh",
+      "DISTRICT_East Khasi Hills": "|correlation| 1.000 > 0.995 with STATE_Meghalaya",
+      "DISTRICT_Jodhpur": "|correlation| 1.000 > 0.995 with STATE_Rajasthan",
+      "DISTRICT_Chennai": "|correlation| 1.000 > 0.995 with STATE_Tamil Nadu",
+      "DISTRICT_West Tripura": "|correlation| 1.000 > 0.995 with STATE_Tripura"
+    },
+    "hazard_ratios": [
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL_Timber",
+        "coef": 1.023513428121021,
+        "hazard_ratio": 2.7829553209001845,
+        "standard_error": 0.18207712062015874,
+        "z": 5.621318178994216,
+        "p_value": 1.895058777508318e-08,
+        "ci_lower": 1.9476992989119506,
+        "ci_upper": 3.9764045314660086
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN___MISSING__",
+        "coef": 0.8065745656732186,
+        "hazard_ratio": 2.240221098477054,
+        "standard_error": 0.5629315012380754,
+        "z": 1.4328112104213218,
+        "p_value": 0.1519117967528835,
+        "ci_lower": 0.7432291258102581,
+        "ci_upper": 6.752413752072136
+      },
+      {
+        "covariate": "OWNER___MISSING__",
+        "coef": 0.7857969760255381,
+        "hazard_ratio": 2.1941549329646315,
+        "standard_error": 0.4459540773139201,
+        "z": 1.762058059337784,
+        "p_value": 0.07805948847408661,
+        "ci_lower": 0.9155255982862872,
+        "ci_upper": 5.258526772888308
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN_Culvert",
+        "coef": -0.7608285917097217,
+        "hazard_ratio": 0.4672790829827599,
+        "standard_error": 0.147999421096197,
+        "z": -5.1407538358896465,
+        "p_value": 2.736383679394444e-07,
+        "ci_lower": 0.34962220324507404,
+        "ci_upper": 0.6245305342926198
+      },
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL_Steel",
+        "coef": 0.719348914947058,
+        "hazard_ratio": 2.053096035242865,
+        "standard_error": 0.13335961220836498,
+        "z": 5.394053739621904,
+        "p_value": 6.88856009208996e-08,
+        "ci_lower": 1.5808598028188252,
+        "ci_upper": 2.6663992103625245
+      },
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL_Prestressed Concrete",
+        "coef": -0.5679254517823316,
+        "hazard_ratio": 0.566699866272548,
+        "standard_error": 0.11002517764005533,
+        "z": -5.16177718558461,
+        "p_value": 2.446163454142228e-07,
+        "ci_lower": 0.45677203706317987,
+        "ci_upper": 0.7030831845533991
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN_Truss",
+        "coef": 0.3502313210797444,
+        "hazard_ratio": 1.4193958468005121,
+        "standard_error": 0.1791032919425513,
+        "z": 1.9554711545563532,
+        "p_value": 0.05052748480372419,
+        "ci_lower": 0.999195643028425,
+        "ci_upper": 2.0163064000242334
+      },
+      {
+        "covariate": "STATE_Himachal Pradesh",
+        "coef": 0.3060307767047141,
+        "hazard_ratio": 1.3580241014114989,
+        "standard_error": 0.24477104771205288,
+        "z": 1.250273590627952,
+        "p_value": 0.2111996222665958,
+        "ci_lower": 0.8405392227337014,
+        "ci_upper": 2.194102797507161
+      },
+      {
+        "covariate": "DISTRICT_Chamoli",
+        "coef": 0.2864581915626754,
+        "hazard_ratio": 1.3317024903302195,
+        "standard_error": 0.25597429559506424,
+        "z": 1.1190896761596516,
+        "p_value": 0.263101883703313,
+        "ci_lower": 0.8063461124218112,
+        "ci_upper": 2.199342807551109
+      },
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL___MISSING__",
+        "coef": -0.2659289674578522,
+        "hazard_ratio": 0.7664935715542739,
+        "standard_error": 0.4158188733886868,
+        "z": -0.6395307776452828,
+        "p_value": 0.5224776981451327,
+        "ci_lower": 0.3392835863524442,
+        "ci_upper": 1.7316263411096025
+      },
+      {
+        "covariate": "STATE_Meghalaya",
+        "coef": 0.26266359768968023,
+        "hazard_ratio": 1.300389191434903,
+        "standard_error": 0.27430694305639475,
+        "z": 0.9575535885567403,
+        "p_value": 0.3382879118578358,
+        "ci_lower": 0.7595963301031554,
+        "ci_upper": 2.226198287412837
+      },
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL_Masonry",
+        "coef": -0.23278344732248551,
+        "hazard_ratio": 0.7923251350770497,
+        "standard_error": 0.1268258494465954,
+        "z": -1.8354574271588648,
+        "p_value": 0.06643794151309196,
+        "ci_lower": 0.6179439357155627,
+        "ci_upper": 1.0159159810313754
+      },
+      {
+        "covariate": "STATE_Madhya Pradesh",
+        "coef": -0.23076540136087104,
+        "hazard_ratio": 0.7939256980778353,
+        "standard_error": 0.24353103121542577,
+        "z": -0.9475810955554885,
+        "p_value": 0.3433427538587672,
+        "ci_lower": 0.4925903163844328,
+        "ci_upper": 1.2795988737554849
+      },
+      {
+        "covariate": "WATERWAY_ADEQUACY",
+        "coef": -0.2244275330328593,
+        "hazard_ratio": 0.7989734737865546,
+        "standard_error": 0.04163336777227507,
+        "z": -5.390568792330859,
+        "p_value": 7.023502236171966e-08,
+        "ci_lower": 0.7363664173922172,
+        "ci_upper": 0.8669034827460631
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN_Suspension",
+        "coef": 0.22362965665509277,
+        "hazard_ratio": 1.2506077793865387,
+        "standard_error": 0.34110047463802007,
+        "z": 0.6556122705264813,
+        "p_value": 0.5120736283983949,
+        "ci_lower": 0.6408787556239507,
+        "ci_upper": 2.440430119015915
+      },
+      {
+        "covariate": "STRUCTURE_KIND_MATERIAL_Composite",
+        "coef": 0.2207006106806208,
+        "hazard_ratio": 1.2469500511468363,
+        "standard_error": 0.13726948806027714,
+        "z": 1.6077907319338713,
+        "p_value": 0.10788101895711658,
+        "ci_lower": 0.9528072592653356,
+        "ci_upper": 1.631898177658717
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN_Beam/Girder",
+        "coef": 0.2158455901384891,
+        "hazard_ratio": 1.240910755348881,
+        "standard_error": 0.10023143366797581,
+        "z": 2.153472042049143,
+        "p_value": 0.031281599044402225,
+        "ci_lower": 1.0195849064739446,
+        "ci_upper": 1.5102807946283394
+      },
+      {
+        "covariate": "DISTRICT_Patna",
+        "coef": -0.20800437221827373,
+        "hazard_ratio": 0.8122034855732543,
+        "standard_error": 0.23115461153046984,
+        "z": -0.8998495458995222,
+        "p_value": 0.3682003233482093,
+        "ci_lower": 0.5163042344095766,
+        "ci_upper": 1.2776856318672634
+      },
+      {
+        "covariate": "STATE_Rajasthan",
+        "coef": -0.17833295975769536,
+        "hazard_ratio": 0.836663801729729,
+        "standard_error": 0.33095731460725647,
+        "z": -0.5388397593487885,
+        "p_value": 0.5899974266862313,
+        "ci_lower": 0.4373605456451583,
+        "ci_upper": 1.6005246108613926
+      },
+      {
+        "covariate": "DISTRICT_Ernakulam",
+        "coef": 0.17388612143982443,
+        "hazard_ratio": 1.1899200517222197,
+        "standard_error": 0.24773091256024585,
+        "z": 0.7019153146563287,
+        "p_value": 0.48273197758559494,
+        "ci_lower": 0.7322322418631919,
+        "ci_upper": 1.9336894069124513
+      },
+      {
+        "covariate": "MAX_SPAN_LEN",
+        "coef": 0.1683329300606279,
+        "hazard_ratio": 1.1833305113723704,
+        "standard_error": 0.04860889749984455,
+        "z": 3.4630065423961987,
+        "p_value": 0.0005341754067789743,
+        "ci_lower": 1.0757964184264905,
+        "ci_upper": 1.301613460651688
+      },
+      {
+        "covariate": "DISTRICT_Darbhanga",
+        "coef": -0.1583748315838627,
+        "hazard_ratio": 0.853529792077231,
+        "standard_error": 0.23012870891964468,
+        "z": -0.688201104188019,
+        "p_value": 0.49132614869170876,
+        "ci_lower": 0.5436667493878207,
+        "ci_upper": 1.3399993778978043
+      },
+      {
+        "covariate": "STATE_Kerala",
+        "coef": 0.1513757203236132,
+        "hazard_ratio": 1.1634337016604919,
+        "standard_error": 0.19458753812715682,
+        "z": 0.7779312168731687,
+        "p_value": 0.4366095638666242,
+        "ci_lower": 0.7945265738947761,
+        "ci_upper": 1.7036283274002826
+      },
+      {
+        "covariate": "DESIGN_LOAD_IRC Class 70R",
+        "coef": 0.1490529456960292,
+        "hazard_ratio": 1.1607344434752167,
+        "standard_error": 0.1547988942621064,
+        "z": 0.96288120407147,
+        "p_value": 0.33560714311288986,
+        "ci_lower": 0.8569743319317898,
+        "ci_upper": 1.5721642971880267
+      },
+      {
+        "covariate": "DISTRICT_Surat",
+        "coef": 0.1402094499741429,
+        "hazard_ratio": 1.1505147489072651,
+        "standard_error": 0.25603124586616766,
+        "z": 0.5476263238879563,
+        "p_value": 0.5839485105257651,
+        "ci_lower": 0.6965591457541845,
+        "ci_upper": 1.900318437452941
+      },
+      {
+        "covariate": "STATE_Bihar",
+        "coef": -0.1401232791599051,
+        "hazard_ratio": 0.8692510682517629,
+        "standard_error": 0.16414396570421433,
+        "z": -0.8536608614196989,
+        "p_value": 0.39329292590740916,
+        "ci_lower": 0.6301234412992702,
+        "ci_upper": 1.199126028542665
+      },
+      {
+        "covariate": "STATE_Karnataka",
+        "coef": -0.13638346316654773,
+        "hazard_ratio": 0.8725079936539015,
+        "standard_error": 0.3083042438898861,
+        "z": -0.4423664800905512,
+        "p_value": 0.658224030968106,
+        "ci_lower": 0.47680452283154245,
+        "ci_upper": 1.596608594375514
+      },
+      {
+        "covariate": "STATE_Tripura",
+        "coef": -0.1344123704956385,
+        "hazard_ratio": 0.8742294838164617,
+        "standard_error": 0.27563268171765926,
+        "z": -0.48765033833441446,
+        "p_value": 0.6257975335479745,
+        "ci_lower": 0.5093384767597664,
+        "ci_upper": 1.5005290690702613
+      },
+      {
+        "covariate": "DISTRICT_Wayanad",
+        "coef": 0.12231734535947823,
+        "hazard_ratio": 1.13011268089557,
+        "standard_error": 0.22762421207814687,
+        "z": 0.5373652663868852,
+        "p_value": 0.5910153306768104,
+        "ci_lower": 0.7233819493271115,
+        "ci_upper": 1.7655329562881394
+      },
+      {
+        "covariate": "STRUCTURE_TYPE_DESIGN_Arch",
+        "coef": -0.117726235069048,
+        "hazard_ratio": 0.888939379733795,
+        "standard_error": 0.1521456861943714,
+        "z": -0.7737730724658775,
+        "p_value": 0.4390649990366763,
+        "ci_lower": 0.6597288904393909,
+        "ci_upper": 1.1977847753722115
+      }
+    ],
+    "monsoon_acceleration": {
+      "hazard_ratio_per_1sd": {
+        "MONSOON_ANOMALY": 1.0076356414068097,
+        "SEASONAL_RAINFALL_MM": 1.0657362248100748,
+        "PEAK_DISCHARGE_M3S": 1.0585061876063009,
+        "PEAK_VELOCITY_MPS": 1.033143839672053,
+        "PEAK_SCOUR_INDEX": 1.045491759537746,
+        "FLOOD_EXCEEDANCE": 1.0312212423779166,
+        "CUMULATIVE_FLOOD_EXCEEDANCE": 1.1223615630194352,
+        "CUMULATIVE_SCOUR_LOAD": 1.1115310610328206
+      },
+      "hazard_ratio_per_2sd": {
+        "MONSOON_ANOMALY": 1.015329585833313,
+        "SEASONAL_RAINFALL_MM": 1.1357937008724301,
+        "PEAK_DISCHARGE_M3S": 1.1204353492008257,
+        "PEAK_VELOCITY_MPS": 1.0673861934523123,
+        "PEAK_SCOUR_INDEX": 1.0930530192613324,
+        "FLOOD_EXCEEDANCE": 1.0634172507314539,
+        "CUMULATIVE_FLOOD_EXCEEDANCE": 1.2596954781434295,
+        "CUMULATIVE_SCOUR_LOAD": 1.2355012996407482
+      },
+      "monsoon_plus_1sd_hazard_ratio": 1.0076356414068097,
+      "monsoon_plus_2sd_hazard_ratio": 1.015329585833313,
+      "combined_1sd_shock_hazard_ratio": 1.2570655050932384,
+      "combined_extreme_shock_hazard_ratio": 1.5802136840953185,
+      "combined_shock_components_1sd": {
+        "monsoon": {
+          "covariate": "MONSOON_ANOMALY",
+          "coefficient": 0.007606637461711412,
+          "delta_sd": 1.0,
+          "delta_model_units": 0.9999999979294107,
+          "linear_predictor_contribution": 0.00760663744596119,
+          "hazard_ratio": 1.0076356414068097
+        },
+        "flood": {
+          "covariate": "CUMULATIVE_FLOOD_EXCEEDANCE",
+          "coefficient": 0.11543500456407875,
+          "delta_sd": 1.0,
+          "delta_model_units": 0.9999999939870509,
+          "linear_predictor_contribution": 0.11543500386997393,
+          "hazard_ratio": 1.1223615630194352
+        },
+        "scour": {
+          "covariate": "CUMULATIVE_SCOUR_LOAD",
+          "coefficient": 0.10573839927349765,
+          "delta_sd": 1.0,
+          "delta_model_units": 0.9999999991194753,
+          "linear_predictor_contribution": 0.10573839918039238,
+          "hazard_ratio": 1.1115310610328206
+        }
+      },
+      "combined_shock_components_2sd": {
+        "monsoon": {
+          "covariate": "MONSOON_ANOMALY",
+          "coefficient": 0.007606637461711412,
+          "delta_sd": 2.0,
+          "delta_model_units": 1.9999999958588215,
+          "linear_predictor_contribution": 0.01521327489192238,
+          "hazard_ratio": 1.015329585833313
+        },
+        "flood": {
+          "covariate": "CUMULATIVE_FLOOD_EXCEEDANCE",
+          "coefficient": 0.11543500456407875,
+          "delta_sd": 2.0,
+          "delta_model_units": 1.9999999879741017,
+          "linear_predictor_contribution": 0.23087000773994787,
+          "hazard_ratio": 1.2596954781434295
+        },
+        "scour": {
+          "covariate": "CUMULATIVE_SCOUR_LOAD",
+          "coefficient": 0.10573839927349765,
+          "delta_sd": 2.0,
+          "delta_model_units": 1.9999999982389507,
+          "linear_predictor_contribution": 0.21147679836078476,
+          "hazard_ratio": 1.2355012996407482
+        }
+      },
+      "composite_dominates_individual_components": true,
+      "standardised_scale_note": "Model covariates are training-standardised, so one model unit is one physical standard deviation; hazard ratios are reported for +1 SD and +2 SD, not for absolute unit increments.",
+      "interpretation": "Hazard ratios above 1 imply accelerated structural failure. The combined shock exponentiates the summed scaled linear predictors exp(sum_i beta_i * delta_i) at the same +1 SD or +2 SD magnitude per component, so it is never smaller than any positive individual component."
+    }
+  },
+  "models": {
+    "cox_time_varying": {
+      "validation": {
+        "model": "cox_time_varying",
+        "n_test": 179,
+        "n_events_test": 94,
+        "event_rate_test": 0.5251396648044693,
+        "harrell_c": 0.771009408387817,
+        "uno_ipcw_c": 0.7344901550364961,
+        "integrated_brier_score": 0.07552696014119423,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.018191035768606482,
+          "25": 0.08598164492536506,
+          "40": 0.19096537001469147
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      },
+      "test": {
+        "model": "cox_time_varying",
+        "n_test": 244,
+        "n_events_test": 129,
+        "event_rate_test": 0.5286885245901639,
+        "harrell_c": 0.7035473731477324,
+        "uno_ipcw_c": 0.6558573473375289,
+        "integrated_brier_score": 0.08920166006256948,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.0001186262863224558,
+          "25": 0.12774927400041278,
+          "40": 0.20324033067164712
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      }
+    },
+    "random_survival_forest": {
+      "validation": {
+        "model": "random_survival_forest",
+        "n_test": 179,
+        "n_events_test": 94,
+        "event_rate_test": 0.5251396648044693,
+        "harrell_c": 0.762557805772604,
+        "uno_ipcw_c": 0.7277526719835767,
+        "integrated_brier_score": 0.07646655201867357,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.018940568734747955,
+          "25": 0.08812642097354921,
+          "40": 0.19102597239647995
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      },
+      "test": {
+        "model": "random_survival_forest",
+        "n_test": 244,
+        "n_events_test": 129,
+        "event_rate_test": 0.5286885245901639,
+        "harrell_c": 0.7304894476874719,
+        "uno_ipcw_c": 0.6627024561290243,
+        "integrated_brier_score": 0.08437347290784951,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.00022966002243269298,
+          "25": 0.11818224344064082,
+          "40": 0.19654280781313033
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      }
+    },
+    "gradient_boosting": {
+      "validation": {
+        "model": "gradient_boosting",
+        "n_test": 179,
+        "n_events_test": 94,
+        "event_rate_test": 0.5251396648044693,
+        "harrell_c": 0.7293892521129006,
+        "uno_ipcw_c": 0.6896785551335887,
+        "integrated_brier_score": 0.07511240394065895,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.018561844387666893,
+          "25": 0.08313027575955674,
+          "40": 0.19341224773614699
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      },
+      "test": {
+        "model": "gradient_boosting",
+        "n_test": 244,
+        "n_events_test": 129,
+        "event_rate_test": 0.5286885245901639,
+        "harrell_c": 0.7281544678940278,
+        "uno_ipcw_c": 0.6634464895004967,
+        "integrated_brier_score": 0.08441963986193414,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.00011115712555112083,
+          "25": 0.11929013601051343,
+          "40": 0.19503026887928582
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      }
+    },
+    "ensemble": {
+      "validation": {
+        "model": "ensemble",
+        "n_test": 179,
+        "n_events_test": 94,
+        "event_rate_test": 0.5251396648044693,
+        "harrell_c": 0.7515547759527986,
+        "uno_ipcw_c": 0.7142070951215357,
+        "integrated_brier_score": 0.07503465579349305,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.01872254649890907,
+          "25": 0.08515556181184727,
+          "40": 0.18951324418431306
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      },
+      "test": {
+        "model": "ensemble",
+        "n_test": 244,
+        "n_events_test": 129,
+        "event_rate_test": 0.5286885245901639,
+        "harrell_c": 0.7363718006286484,
+        "uno_ipcw_c": 0.6686691071766427,
+        "integrated_brier_score": 0.0836105722917622,
+        "brier_scores": {
+          "5": 0.0,
+          "10": 0.0,
+          "15": 0.0001414781388123445,
+          "25": 0.118294730357057,
+          "40": 0.19288330862764957
+        },
+        "requested_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ],
+        "evaluated_horizons": [
+          5.0,
+          10.0,
+          15.0,
+          25.0,
+          40.0
+        ]
+      }
+    }
+  },
+  "model_selection": {
+    "selected_model": "cox_time_varying",
+    "criterion": "validation Uno IPCW C-index (Harrell fallback)",
+    "validation_scores": {
+      "cox_time_varying": 0.7344901550364961,
+      "random_survival_forest": 0.7277526719835767,
+      "gradient_boosting": 0.6896785551335887,
+      "ensemble": 0.7142070951215357
+    }
+  },
+  "feature_importance": {
+    "random_survival_forest": [
+      {
+        "feature": "DECK_LEN",
+        "importance": 0.05332677580271201
+      },
+      {
+        "feature": "MAX_SPAN_LEN",
+        "importance": 0.05276470174945549
+      },
+      {
+        "feature": "PRE_ENTRY_RAINFALL_MEAN_5Y",
+        "importance": 0.04770603527014684
+      },
+      {
+        "feature": "TRUCK_ADT_PCT",
+        "importance": 0.04665214642029087
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.04665214642029087
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MEAN_5Y",
+        "importance": 0.046511627906976744
+      },
+      {
+        "feature": "ADT_TRAFFIC",
+        "importance": 0.04630085013700555
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.045879294597063164
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MAX_5Y",
+        "importance": 0.045246961287149584
+      },
+      {
+        "feature": "PRE_ENTRY_SCOUR_MAX_5Y",
+        "importance": 0.04510644277383545
+      },
+      {
+        "feature": "ROADWAY_WIDTH",
+        "importance": 0.044403850207264804
+      },
+      {
+        "feature": "TRAFFIC_GROWTH_RATE",
+        "importance": 0.043771516897351224
+      },
+      {
+        "feature": "FLOOD_PRONENESS",
+        "importance": 0.04320944284409471
+      },
+      {
+        "feature": "YEAR_BUILT",
+        "importance": 0.03997751703786974
+      },
+      {
+        "feature": "WATERWAY_ADEQUACY",
+        "importance": 0.0344972950186187
+      },
+      {
+        "feature": "NUM_SPANS",
+        "importance": 0.02585540644979976
+      },
+      {
+        "feature": "PRE_ENTRY_FLOOD_EXCEEDANCES_5Y",
+        "importance": 0.015808332747839528
+      },
+      {
+        "feature": "OWNER_State PWD",
+        "importance": 0.015457036464554205
+      },
+      {
+        "feature": "DESIGN_LOAD_Pre-IRC",
+        "importance": 0.015175999437925946
+      },
+      {
+        "feature": "DESIGN_LOAD_IRC Class A",
+        "importance": 0.014824703154640623
+      },
+      {
+        "feature": "STRUCTURE_TYPE_DESIGN_Beam/Girder",
+        "importance": 0.014543666128012365
+      },
+      {
+        "feature": "SCOUR_CRITICAL",
+        "importance": 0.014262629101384107
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Steel",
+        "importance": 0.012084592145015106
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Prestressed Concrete",
+        "importance": 0.011944073631700976
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Timber",
+        "importance": 0.010890184781845008
+      }
+    ],
+    "gradient_boosting": [
+      {
+        "feature": "YEAR_BUILT",
+        "importance": 0.13942860217865963
+      },
+      {
+        "feature": "MAX_SPAN_LEN",
+        "importance": 0.12172920642861897
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Timber",
+        "importance": 0.11904125873784266
+      },
+      {
+        "feature": "WATERWAY_ADEQUACY",
+        "importance": 0.09668798492157152
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Prestressed Concrete",
+        "importance": 0.09083062199137129
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Steel",
+        "importance": 0.0786831202470543
+      },
+      {
+        "feature": "DECK_LEN",
+        "importance": 0.06542683193338847
+      },
+      {
+        "feature": "STRUCTURE_TYPE_DESIGN_Culvert",
+        "importance": 0.05280379008783765
+      },
+      {
+        "feature": "PRE_ENTRY_RAINFALL_MEAN_5Y",
+        "importance": 0.02001128424652277
+      },
+      {
+        "feature": "TRUCK_ADT_PCT",
+        "importance": 0.019290811026659253
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.018148773620558434
+      },
+      {
+        "feature": "FLOOD_PRONENESS",
+        "importance": 0.016709898490235714
+      },
+      {
+        "feature": "ADT_TRAFFIC",
+        "importance": 0.016229188293619776
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Composite",
+        "importance": 0.013584315575295339
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MEAN_5Y",
+        "importance": 0.013426119130580873
+      },
+      {
+        "feature": "TRAFFIC_GROWTH_RATE",
+        "importance": 0.012343038953098509
+      },
+      {
+        "feature": "PRE_ENTRY_SCOUR_MAX_5Y",
+        "importance": 0.011793399686377602
+      },
+      {
+        "feature": "DISTRICT_Mumbai Suburban",
+        "importance": 0.010899064040409431
+      },
+      {
+        "feature": "PRE_ENTRY_FLOOD_EXCEEDANCES_5Y",
+        "importance": 0.010017711068787277
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.006704991640335055
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MAX_5Y",
+        "importance": 0.006029724072286735
+      },
+      {
+        "feature": "ROADWAY_WIDTH",
+        "importance": 0.00512088295891966
+      },
+      {
+        "feature": "STRUCTURE_TYPE_DESIGN_Arch",
+        "importance": 0.00492334702693152
+      },
+      {
+        "feature": "DISTRICT_Chennai",
+        "importance": 0.004604973085311873
+      },
+      {
+        "feature": "STATE_Madhya Pradesh",
+        "importance": 0.004364343771407926
+      }
+    ],
+    "ensemble": [
+      {
+        "feature": "YEAR_BUILT",
+        "importance": 0.08970305960826469
+      },
+      {
+        "feature": "MAX_SPAN_LEN",
+        "importance": 0.08724695408903724
+      },
+      {
+        "feature": "WATERWAY_ADEQUACY",
+        "importance": 0.06559263997009511
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Timber",
+        "importance": 0.06496572175984383
+      },
+      {
+        "feature": "DECK_LEN",
+        "importance": 0.05937680386805024
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Prestressed Concrete",
+        "importance": 0.05138734781153614
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Steel",
+        "importance": 0.0453838561960347
+      },
+      {
+        "feature": "PRE_ENTRY_RAINFALL_MEAN_5Y",
+        "importance": 0.03385865975833481
+      },
+      {
+        "feature": "TRUCK_ADT_PCT",
+        "importance": 0.03297147872347506
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.032014034108810804
+      },
+      {
+        "feature": "ADT_TRAFFIC",
+        "importance": 0.03126501921531267
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MEAN_5Y",
+        "importance": 0.02996887351877881
+      },
+      {
+        "feature": "FLOOD_PRONENESS",
+        "importance": 0.029959670667165216
+      },
+      {
+        "feature": "STRUCTURE_TYPE_DESIGN_Culvert",
+        "importance": 0.029739209735129394
+      },
+      {
+        "feature": "PRE_ENTRY_SCOUR_MAX_5Y",
+        "importance": 0.02844992123010653
+      },
+      {
+        "feature": "TRAFFIC_GROWTH_RATE",
+        "importance": 0.02805727792522487
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.026678569030312967
+      },
+      {
+        "feature": "PRE_ENTRY_MONSOON_MAX_5Y",
+        "importance": 0.02563834267971816
+      },
+      {
+        "feature": "ROADWAY_WIDTH",
+        "importance": 0.024762366583092235
+      },
+      {
+        "feature": "NUM_SPANS",
+        "importance": 0.013447615967905537
+      },
+      {
+        "feature": "PRE_ENTRY_FLOOD_EXCEEDANCES_5Y",
+        "importance": 0.012913021908313404
+      },
+      {
+        "feature": "STRUCTURE_KIND_MATERIAL_Composite",
+        "importance": 0.010129472478858237
+      },
+      {
+        "feature": "OWNER_State PWD",
+        "importance": 0.00974130663036147
+      },
+      {
+        "feature": "SCOUR_CRITICAL",
+        "importance": 0.008865759248579644
+      },
+      {
+        "feature": "STRUCTURE_TYPE_DESIGN_Beam/Girder",
+        "importance": 0.008518723264031573
+      }
+    ]
+  },
+  "checks": {
+    "static_feature_allowlist_enforced": true,
+    "time_varying_feature_allowlist_enforced": true,
+    "cox_intervals_valid": true,
+    "cox_no_constant_features": true,
+    "cox_collinearity_filter_applied": true,
+    "survival_probabilities_monotone": true,
+    "requests_evaluated_in_followup": true,
+    "prospective_safe": true,
+    "metrics_are_survival_specific": true
+  },
+  "runtime_seconds": 5.3109575000125915
+}
