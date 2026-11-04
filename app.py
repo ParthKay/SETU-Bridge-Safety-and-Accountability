@@ -13,6 +13,7 @@ state.
 
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from collections.abc import Mapping
@@ -31,22 +32,33 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+import bridge_engine.gui_backend as _gui_backend  # noqa: E402
+
+if not hasattr(_gui_backend, "apply_inspector_identity"):
+    _gui_backend = importlib.reload(_gui_backend)
+
 from bridge_engine.gui_backend import (  # noqa: E402
     CURVE_GRID,
     DECISION_HORIZON,
     FORCE_PLOT_DIR,
     RUL_HORIZON,
     SURVIVAL_THRESHOLD,
+    apply_inspector_identity,
     attachment_for_bridge,
     audit_overlay_signature,
+    authenticate,
     build_audit_table,
+    build_demo_accounts,
     build_forced_event,
     build_master_queue,
+    climate_history_for_bridge,
     curves_for_bridge,
     district_coordinate_table,
     events_summary,
+    explain_bridge,
     fetch_live_weather,
     hazard_ratio_payload,
+    inspection_history_for_bridge,
     ledger_signature,
     load_or_create_ledger,
     load_runtime_bundle,
@@ -54,6 +66,7 @@ from bridge_engine.gui_backend import (  # noqa: E402
     rescore_submitted_bridge,
     safe_filename,
     scenario_event_for_bridge,
+    scope_bridge_ids,
     shap_contributions,
     shocks_to_events,
     run_module4_regions,
@@ -119,6 +132,49 @@ st.markdown(
             margin: 0.1rem 0 0.5rem 0;
         }
         [data-testid="stSidebar"] {background: #f8fafc;}
+        [data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer,
+        [data-testid="stAppDeployButton"], [data-testid="stToolbarActions"] {
+            visibility: hidden;
+            height: 0;
+        }
+        .zt-login-hero {
+            background: linear-gradient(120deg, #0f172a 0%, #1e3a8a 58%, #0e7490 100%);
+            color: #f8fafc;
+            padding: 1.6rem 1.7rem;
+            border-radius: 16px;
+            margin: 1.0rem 0 1.1rem 0;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.26);
+        }
+        .zt-login-hero h1 {font-size: 1.9rem; margin: 0.15rem 0 0.35rem 0; letter-spacing: -0.02em;}
+        .zt-login-hero p {margin: 0; color: #cbd5e1; font-size: 0.94rem;}
+        .zt-user-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #1d4ed8;
+            border-radius: 10px;
+            padding: 0.7rem 0.85rem;
+            margin-bottom: 0.9rem;
+        }
+        .zt-user-card .zt-user-name {font-weight: 800; color: #0f172a; font-size: 0.98rem;}
+        .zt-user-card .zt-user-meta {color: #475569; font-size: 0.8rem; line-height: 1.45;}
+        .zt-role-locked {
+            background: #f1f5f9;
+            border: 1px dashed #cbd5e1;
+            border-radius: 9px;
+            padding: 0.55rem 0.7rem;
+            color: #94a3b8;
+            font-size: 0.84rem;
+            margin-top: 0.3rem;
+        }
+        .zt-evidence {
+            border-left: 4px solid #1d4ed8;
+            background: #f8fafc;
+            padding: 0.55rem 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+        .zt-evidence .zt-evidence-factor {font-weight: 800; color: #0f172a; font-size: 0.86rem;}
+        .zt-evidence .zt-evidence-text {color: #334155; font-size: 0.84rem;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -266,12 +322,148 @@ def _init_state() -> None:
         "live_triage": pd.DataFrame(),
         "live_triage_errors": [],
         "auth_selected_bridge": "",
+        "audit_dossier_bridge": "",
+        "audit_table_nonce": 0,
+        "auth_user": None,
+        "login_emp": "—",
+        "login_pwd": "",
         "inspector_receipt": None,
         "force_alert_toggle": False,
         "event_notice": "",
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
+
+
+def _role_label(account: Mapping[str, Any]) -> str:
+    return "Field Inspector" if str(account.get("ROLE")) == "INSPECTOR" else "Command Centre"
+
+
+def _initials(name: str) -> str:
+    tokens = [token for token in str(name).split() if token]
+    return "".join(token[0] for token in tokens[:2]).upper() or "ZT"
+
+
+def render_login(accounts: Mapping[str, Mapping[str, Any]]) -> None:
+    """Render the EMP-ID / password gate before any portal is exposed."""
+
+    st.markdown(
+        '<div class="zt-login-hero">'
+        '<div class="zt-kicker">National Bridge Reliability Command · Restricted Access</div>'
+        '<h1>Zero-Trust Bridge Survival &amp; Audit Portal</h1>'
+        '<p>Sign in with your government EMP-ID. Field inspectors receive a blind '
+        'submission view. NHAI and State PWD command centres receive the full '
+        'vigilance, meteorology and explainability view, strictly limited to their '
+        'own jurisdiction.</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    left, centre, right = st.columns([0.9, 1.15, 0.9])
+    with centre:
+        catalog = pd.DataFrame(
+            [
+                {
+                    "EMP-ID": account["EMP_ID"],
+                    "Role": _role_label(account),
+                    "Officer": account["NAME"],
+                    "Jurisdiction": account["SCOPE_LABEL"],
+                    "Password": account["PASSWORD"],
+                }
+                for account in sorted(accounts.values(), key=lambda item: item["EMP_ID"])
+            ]
+        )
+        with st.container(border=True):
+            st.markdown("#### Secure sign in")
+            with st.form("login_form", clear_on_submit=False):
+                emp_id = st.selectbox(
+                    "Employee ID (EMP-ID)",
+                    ["—"] + catalog["EMP-ID"].tolist(),
+                    key="login_emp",
+                    help="Select your government EMP-ID. Demo profiles are listed below.",
+                )
+                password = st.text_input(
+                    "Password",
+                    key="login_pwd",
+                    type="password",
+                    placeholder="Enter your portal password",
+                )
+                submitted = st.form_submit_button(
+                    "Sign in", type="primary", use_container_width=True
+                )
+            if submitted and emp_id == "—":
+                st.error("Select an EMP-ID to sign in.")
+            elif submitted:
+                account = authenticate(emp_id, password, accounts)
+                if account is None:
+                    st.error("Invalid EMP-ID or password. Use one of the demo profiles below.")
+                else:
+                    st.session_state["auth_user"] = account
+                    st.session_state["portal_role"] = (
+                        "Field Inspector Portal"
+                        if account["ROLE"] == "INSPECTOR"
+                        else "NHAI / State PWD Command Center"
+                    )
+                    st.session_state["inspector_receipt"] = None
+                    st.session_state["active_events"] = []
+                    st.session_state["live_triage"] = pd.DataFrame()
+                    st.session_state["live_weather"] = None
+                    st.session_state["last_weather_sync"] = ""
+                    st.session_state["event_notice"] = ""
+                    st.session_state["auth_selected_bridge"] = ""
+                    st.session_state["audit_dossier_bridge"] = ""
+                    st.session_state["audit_table_nonce"] = (
+                        int(st.session_state.get("audit_table_nonce", 0)) + 1
+                    )
+                    st.rerun()
+
+        with st.expander("Demo EMP-IDs, jurisdictions and passwords", expanded=True):
+            st.caption(
+                "One blind inspector and one State PWD command centre are provisioned "
+                "for every state present in the national inventory, plus a national NHAI "
+                "command centre. NHAI sees national-highway bridges only. Demo credentials."
+            )
+            render_dataframe(catalog, height=280)
+
+    st.caption(
+        "Access is enforced per tenant: a Bihar PWD command centre can only read Bihar "
+        "bridges, an NHAI command centre only NHAI-owned national highways, and an "
+        "inspector only their own State PWD assignment."
+    )
+
+
+def render_signed_in_user(account: Mapping[str, Any]) -> None:
+    st.markdown(
+        f'<div class="zt-user-card">'
+        f'<div class="zt-user-name">{account.get("NAME", "Officer")}</div>'
+        f'<div class="zt-user-meta">'
+        f'{account.get("DESIGNATION", "")} · seniority #{int(account.get("SENIORITY_RANK", 0))}<br>'
+        f'EMP-ID: <b>{account.get("EMP_ID", "")}</b><br>'
+        f'{account.get("SCOPE_LABEL", "")}<br>'
+        f'{account.get("PHONE", "")}'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def selectable_table(frame: Any, key: str, height: int = 480) -> list[int]:
+    """Render a click-selectable table, falling back on older Streamlit versions."""
+
+    try:
+        event = st.dataframe(
+            frame,
+            on_select="rerun",
+            selection_mode="single-row",
+            key=key,
+            hide_index=True,
+            height=height,
+            use_container_width=True,
+        )
+        selection = getattr(event, "selection", None)
+        return [int(value) for value in (getattr(selection, "rows", None) or [])]
+    except Exception:
+        st.dataframe(frame, hide_index=True, height=height, use_container_width=True)
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -282,10 +474,23 @@ def _init_state() -> None:
 def render_inspector_portal(
     runtime: Mapping[str, Any],
     ledger: pd.DataFrame,
+    account: Mapping[str, Any] | None = None,
+    visible_ids: set[str] | None = None,
 ) -> None:
     bridges = runtime.get("bridges")
     if bridges is None or bridges.empty:
         st.error("The persisted bridge inventory is unavailable.")
+        return
+    if visible_ids is not None:
+        bridges = bridges.loc[bridges["BRIDGE_ID"].astype(str).isin(visible_ids)]
+        ledger_display = ledger.loc[ledger["BRIDGE_ID"].astype(str).isin(visible_ids)]
+    else:
+        ledger_display = ledger
+    if bridges.empty:
+        st.error(
+            "No bridges are assigned to this EMP-ID. Contact your State PWD command "
+            "centre for an assignment."
+        )
         return
 
     st.markdown(
@@ -303,10 +508,21 @@ def render_inspector_portal(
         "Blind mode is active. Submit only what you physically observe today. "
         "The central audit engine will verify the claim independently after submission."
     )
+    if account:
+        st.markdown(
+            f'<div class="zt-card">'
+            f'<div class="zt-section-title">Signed-in inspecting officer</div>'
+            f'<b>{account.get("NAME", "")}</b> · {account.get("DESIGNATION", "")} '
+            f'(seniority #{int(account.get("SENIORITY_RANK", 0))})<br>'
+            f'<span class="zt-muted">EMP-ID <b>{account.get("EMP_ID", "")}</b> · '
+            f'{account.get("PHONE", "")} · {account.get("SCOPE_LABEL", "")}</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
     inventory = bridges.copy()
     inventory["BRIDGE_ID"] = inventory["BRIDGE_ID"].astype(str)
-    ledger_view = ledger.copy()
+    ledger_view = ledger_display.copy()
     ledger_view["BRIDGE_ID"] = ledger_view["BRIDGE_ID"].astype(str)
     record = inventory.merge(
         ledger_view,
@@ -329,6 +545,7 @@ def render_inspector_portal(
     label_lookup = dict(zip(record["BRIDGE_ID"], record["LABEL"], strict=False))
     options = record["BRIDGE_ID"].tolist()
 
+    ensure_select_state("inspector_bridge_select", options)
     selected = st.selectbox(
         "Select assigned bridge",
         options,
@@ -342,7 +559,10 @@ def render_inspector_portal(
         f'<b>{selected}</b> — {chosen["DISTRICT"]}, {chosen["STATE"]}<br>'
         f'<span class="zt-muted">Managing agency: <b>{chosen["MANAGING_AGENCY"]}</b> · '
         f'Current inspector: <b>{chosen["CURRENT_INSPECTOR_NAME"]}</b> '
-        f'({chosen["CURRENT_INSPECTOR_ID"]})</span>'
+        f'({chosen["CURRENT_INSPECTOR_ID"]}) · '
+        f'{chosen.get("CURRENT_INSPECTOR_DESIGNATION", "Engineer")} · '
+        f'rank #{int(chosen.get("CURRENT_INSPECTOR_SENIORITY_RANK", 0))} · '
+        f'{chosen.get("CURRENT_INSPECTOR_PHONE", "—")}</span>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -412,7 +632,7 @@ def render_inspector_portal(
         try:
             upload_bytes = upload.getvalue() if upload is not None else None
             upload_name = upload.name if upload is not None else None
-            updated_ledger, submission = record_inspection_submission(
+            _, submission = record_inspection_submission(
                 ledger,
                 bridge_id=str(selected),
                 reported_condition=reported,
@@ -423,6 +643,7 @@ def render_inspector_portal(
                 remarks=str(remarks),
                 upload_name=upload_name,
                 upload_bytes=upload_bytes,
+                inspector=account,
                 root=ROOT,
             )
             audit_note = "central audit re-score completed"
@@ -472,8 +693,16 @@ def render_inspector_portal(
 # ---------------------------------------------------------------------------
 
 
-def sync_weather(runtime: Mapping[str, Any]) -> dict[str, Any]:
-    coordinates = district_coordinate_table(runtime.get("bridges", pd.DataFrame()))
+def sync_weather(
+    runtime: Mapping[str, Any],
+    scope_bridges: pd.DataFrame | None = None,
+) -> dict[str, Any]:
+    bridges = (
+        scope_bridges
+        if scope_bridges is not None
+        else runtime.get("bridges", pd.DataFrame())
+    )
+    coordinates = district_coordinate_table(bridges)
     nonce = int(st.session_state.get("weather_nonce", 0))
     with st.spinner("Syncing live IMD bulletins and Open-Meteo district forecasts..."):
         weather = cached_weather(coordinates, nonce)
@@ -519,8 +748,22 @@ def sync_weather(runtime: Mapping[str, Any]) -> dict[str, Any]:
     return weather
 
 
-def _weather_bar(weather: Mapping[str, Any], runtime: Mapping[str, Any]) -> None:
+def _weather_bar(
+    weather: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+    scope_bridges: pd.DataFrame | None = None,
+) -> None:
     districts = weather.get("districts", pd.DataFrame())
+    scope_frame = (
+        scope_bridges
+        if scope_bridges is not None
+        else runtime.get("bridges", pd.DataFrame())
+    )
+    allowed_states = (
+        {str(value) for value in scope_frame["STATE"].dropna().astype(str).unique()}
+        if scope_frame is not None and not scope_frame.empty and "STATE" in scope_frame.columns
+        else set()
+    )
     st.markdown("#### Live Meteorological & Flash-Flood Status")
     if weather.get("offline"):
         st.warning(
@@ -576,6 +819,17 @@ def _weather_bar(weather: Mapping[str, Any], runtime: Mapping[str, Any]) -> None
             display["ALERT_LEVEL"],
             "NORMAL",
         )
+        st.markdown("##### District exposure table")
+        st.caption(
+            "One row per modelled district with bridges in your jurisdiction. "
+            "`N_BRIDGES` is the number of in-scope bridges in that district; rainfall "
+            "and warning status are live. This is not the bridge queue."
+        )
+        if display["DISTRICT"].astype(str).nunique() == 1:
+            st.caption(
+                "The synthetic national inventory uses one representative district per "
+                "state, so every in-scope bridge is currently geocoded to that district."
+            )
         columns = [
             "STATE",
             "DISTRICT",
@@ -591,7 +845,12 @@ def _weather_bar(weather: Mapping[str, Any], runtime: Mapping[str, Any]) -> None
         columns = [column for column in columns if column in display.columns]
         render_dataframe(display.loc[:, columns])
         with st.expander("State-wide IMD warning bulletins", expanded=False):
-            bulletins = weather.get("bulletins", [])
+            bulletins = [
+                bulletin
+                for bulletin in weather.get("bulletins", [])
+                if not allowed_states
+                or str(bulletin.get("state", "")).strip() in allowed_states
+            ]
             if bulletins:
                 for bulletin in bulletins[:20]:
                     st.markdown(
@@ -604,7 +863,12 @@ def _weather_bar(weather: Mapping[str, Any], runtime: Mapping[str, Any]) -> None
 
     st.divider()
     st.markdown("#### Authority Flash-Flood Trigger")
-    coordinates = district_coordinate_table(runtime.get("bridges", pd.DataFrame()))
+    source = (
+        scope_bridges
+        if scope_bridges is not None
+        else runtime.get("bridges", pd.DataFrame())
+    )
+    coordinates = district_coordinate_table(source)
     force = st.toggle(
         "Force Live IMD Flash-Flood Alert",
         key="force_alert_toggle",
@@ -616,6 +880,7 @@ def _weather_bar(weather: Mapping[str, Any], runtime: Mapping[str, Any]) -> None
     if force and not coordinates.empty:
         state_options = sorted(coordinates["STATE"].astype(str).unique().tolist())
         selector = st.columns([1, 1, 0.9, 1.1])
+        ensure_select_state("force_state_select", state_options)
         state_choice = selector[0].selectbox(
             "State", state_options, key="force_state_select"
         )
@@ -729,8 +994,9 @@ def render_live_queue_tab(
     ledger: pd.DataFrame,
     queue: pd.DataFrame,
     weather: Mapping[str, Any],
+    scope_bridges: pd.DataFrame | None = None,
 ) -> None:
-    _weather_bar(weather, runtime)
+    _weather_bar(weather, runtime, scope_bridges)
 
     st.divider()
     st.markdown("#### Master Revised Bridge Repair Queue")
@@ -759,6 +1025,10 @@ def render_live_queue_tab(
     districts = ["All"] + sorted(queue["DISTRICT"].dropna().astype(str).unique().tolist())
     agencies = ["All"] + sorted(queue["MANAGING_AGENCY"].dropna().astype(str).unique().tolist())
     priorities = ["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    ensure_select_state("queue_state_filter", states)
+    ensure_select_state("queue_district_filter", districts)
+    ensure_select_state("queue_agency_filter", agencies)
+    ensure_select_state("queue_priority_filter", priorities)
     state_filter = filter_columns[0].selectbox("State", states, key="queue_state_filter")
     district_filter = filter_columns[1].selectbox("District", districts, key="queue_district_filter")
     agency_filter = filter_columns[2].selectbox("Managing Agency", agencies, key="queue_agency_filter")
@@ -956,10 +1226,371 @@ def _render_accountability_card(
                 st.error(f"Attachment could not be read: {type(exc).__name__}: {exc}")
 
 
+def _render_bridge_dossier(
+    runtime: Mapping[str, Any],
+    ledger: pd.DataFrame,
+    audit_row: Mapping[str, Any],
+    scope_bridges: pd.DataFrame | None = None,
+    weather: Mapping[str, Any] | None = None,
+    queue_row: Mapping[str, Any] | None = None,
+) -> None:
+    """Full click-through explainability dossier for one audited bridge."""
+
+    bridge_id = str(audit_row.get("BRIDGE_ID", ""))
+    inventory = scope_bridges if scope_bridges is not None else runtime.get("bridges", pd.DataFrame())
+    bridge_frame = (
+        inventory.loc[inventory["BRIDGE_ID"].astype(str).eq(bridge_id)]
+        if inventory is not None and not inventory.empty
+        else pd.DataFrame()
+    )
+    bridge_row = bridge_frame.iloc[0].to_dict() if not bridge_frame.empty else dict(audit_row)
+    ledger_frame = ledger.loc[ledger["BRIDGE_ID"].astype(str).eq(bridge_id)]
+    ledger_row = ledger_frame.iloc[0].to_dict() if not ledger_frame.empty else dict(audit_row)
+    weather = weather or {}
+
+    st.markdown(f"#### Explainability dossier · `{bridge_id}`")
+    st.caption(
+        f"{bridge_row.get('DISTRICT', audit_row.get('DISTRICT', 'Unknown'))}, "
+        f"{bridge_row.get('STATE', audit_row.get('STATE', 'Unknown'))} · "
+        f"{audit_row.get('MANAGING_AGENCY', ledger_row.get('MANAGING_AGENCY', 'Unassigned'))} · "
+        f"structure {bridge_row.get('STRUCTURE_KIND_MATERIAL', 'unknown')} "
+        f"{bridge_row.get('STRUCTURE_TYPE_DESIGN', '')}"
+    )
+
+    top = st.columns(6)
+    top[0].metric("Claimed Rating", f"{safe_int(audit_row.get('REPORTED_LAST_MIN_COND', 0))} / 9")
+    top[1].metric(
+        "Physics-Implied",
+        f"{fmt(audit_row.get('PHYSICS_EXPECTED_CONDITION'), 2)} / 9",
+        help="9 × S(t0 + 5 | t0), a monotone NBI-scale survival proxy.",
+    )
+    top[2].metric("Condition Gap", f"{fmt(audit_row.get('CONDITION_GAP'), 2)} pts")
+    top[3].metric("Audit Z-Score", fmt(audit_row.get("AUDIT_Z_SCORE"), 2))
+    top[4].metric(
+        "5-Year Survival",
+        fmt(audit_row.get("EXPECTED_SURVIVAL"), 3),
+        help=f"Audit threshold τ = {SURVIVAL_THRESHOLD:.2f}.",
+    )
+    top[5].metric(
+        "Triage Priority",
+        str(audit_row.get("TRIAGE_PRIORITY", queue_row.get("TRIAGE_PRIORITY", "—") if queue_row else "—")),
+    )
+
+    climate = climate_history_for_bridge(runtime.get("climate"), bridge_row)
+    summary = climate["summary"]
+
+    location_tab, why_tab, weather_tab, inspector_tab = st.tabs(
+        [
+            "Location & map",
+            "Why this bridge was flagged",
+            "Weather since construction",
+            "Inspectors & full history",
+        ]
+    )
+
+    with location_tab:
+        map_column, fact_column = st.columns([1.45, 1])
+        latitude = _safe_float(bridge_row.get("LATITUDE"))
+        longitude = _safe_float(bridge_row.get("LONGITUDE"))
+        with map_column:
+            if latitude is not None and longitude is not None:
+                map_frame = pd.DataFrame({"lat": [latitude], "lon": [longitude]})
+                try:
+                    st.map(map_frame, zoom=9, use_container_width=True)
+                except TypeError:
+                    st.map(map_frame, zoom=9)
+                st.caption(
+                    f"Exact pin: `{latitude:.5f}, {longitude:.5f}` · "
+                    f"[open in Google Maps](https://www.google.com/maps/search/?api=1&query={latitude:.6f},{longitude:.6f})"
+                )
+            else:
+                st.info("No geocoded latitude/longitude is stored for this bridge.")
+        with fact_column:
+            st.markdown(
+                f'<div class="zt-card">'
+                f'<div class="zt-section-title">Asset location</div>'
+                f'District: <b>{bridge_row.get("DISTRICT", "Unknown")}</b><br>'
+                f'State: <b>{bridge_row.get("STATE", "Unknown")}</b><br>'
+                f'Owner: <b>{bridge_row.get("OWNER", "Unknown")}</b><br>'
+                f'Year built: <b>{safe_int(bridge_row.get("YEAR_BUILT"), 0) or "—"}</b><br>'
+                f'Material / design: <b>{bridge_row.get("STRUCTURE_KIND_MATERIAL", "—")} · '
+                f'{bridge_row.get("STRUCTURE_TYPE_DESIGN", "—")}</b><br>'
+                f'No. of spans: <b>{safe_int(bridge_row.get("NO_OF_SPANS"), 0) or "—"}</b> · '
+                f'length <b>{fmt(bridge_row.get("LENGTH_M"), 1)} m</b><br>'
+                f'Waterway adequacy: <b>{safe_int(bridge_row.get("WATERWAY_ADEQUACY"), 0)} / 9</b><br>'
+                f'Design load: <b>{bridge_row.get("DESIGN_LOAD", "—")}</b>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                " ".join(
+                    [
+                        pill(
+                            f"PAPER_INSPECTION_SUSPECT = {bool(audit_row.get('PAPER_INSPECTION_SUSPECT', False))}",
+                            "danger" if bool(audit_row.get("PAPER_INSPECTION_SUSPECT", False)) else "success",
+                        ),
+                        pill(
+                            f"AUDIT_ALERT = {bool(audit_row.get('AUDIT_ALERT', False))}",
+                            "danger" if bool(audit_row.get("AUDIT_ALERT", False)) else "success",
+                        ),
+                        pill(
+                            f"ISOLATION_ANOMALY = {bool(audit_row.get('ISOLATION_FLAG', False))}",
+                            "warning" if bool(audit_row.get("ISOLATION_FLAG", False)) else "neutral",
+                        ),
+                    ]
+                ),
+                unsafe_allow_html=True,
+            )
+
+    with why_tab:
+        st.markdown("##### Physics-linked evidence chain")
+        evidence = explain_bridge(bridge_row, ledger_row, audit_row, summary)
+        for index, item in enumerate(evidence, start=1):
+            st.markdown(
+                f'<div class="zt-evidence">'
+                f'<div class="zt-evidence-factor">{index}. {item["factor"]}</div>'
+                f'<div class="zt-evidence-text">{item["evidence"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        components = st.columns(4)
+        components[0].metric("Deck", f"{safe_int(audit_row.get('REPORTED_LAST_DECK_COND', 0))} / 9")
+        components[1].metric(
+            "Superstructure", f"{safe_int(audit_row.get('REPORTED_LAST_SUPERSTRUCTURE_COND', 0))} / 9"
+        )
+        components[2].metric(
+            "Substructure", f"{safe_int(audit_row.get('REPORTED_LAST_SUBSTRUCTURE_COND', 0))} / 9"
+        )
+        components[3].metric(
+            "Inspection method", str(audit_row.get("LAST_INSPECTION_METHOD", "—"))
+        )
+
+        st.markdown("##### Local SHAP attribution")
+        contributions, source_note = shap_contributions(
+            runtime,
+            bridge_id,
+            events=list(st.session_state.get("active_events", [])),
+            scenario_event=scenario_event_for_bridge(
+                bridge_id,
+                str(bridge_row.get("STATE", "")),
+                str(bridge_row.get("DISTRICT", "")),
+            ),
+            use_persisted=False,
+        )
+        if contributions.empty:
+            contributions, source_note = shap_contributions(runtime, bridge_id, use_persisted=True)
+        if contributions.empty:
+            st.info("No SHAP attribution is available for this bridge.")
+        else:
+            chart_data = contributions.sort_values("SHAP_VALUE", ascending=True).copy()
+            colors = [
+                "#dc2626" if float(value) >= 0.0 else "#2563eb"
+                for value in chart_data["SHAP_VALUE"]
+            ]
+            shap_figure = go.Figure(
+                go.Bar(
+                    y=chart_data["FEATURE"].astype(str),
+                    x=chart_data["SHAP_VALUE"].astype(float),
+                    orientation="h",
+                    marker_color=colors,
+                    text=[fmt(value, 3) for value in chart_data["SHAP_VALUE"]],
+                    textposition="outside",
+                    hovertemplate="%{y}<br>SHAP contribution = %{x:.4f}<extra></extra>",
+                )
+            )
+            shap_figure.add_vline(x=0.0, line_color="#64748b", line_width=1)
+            shap_figure.update_layout(
+                height=max(360, 32 * len(chart_data)),
+                template="plotly_white",
+                title="Physical factors pushing this bridge toward failure",
+                xaxis_title="Risk contribution",
+                yaxis_title="",
+                margin={"l": 10, "r": 40, "t": 60, "b": 10},
+            )
+            render_plotly(shap_figure)
+            st.caption(source_note)
+
+    with weather_tab:
+        st.markdown(
+            f"##### Climate exposure since construction "
+            f"({climate.get('since_year') or '—'} → {datetime.utcnow().year})"
+        )
+        metrics = st.columns(5)
+        metrics[0].metric("Years covered", f"{safe_int(summary.get('YEARS_COVERED'), 0)}")
+        metrics[1].metric(
+            "Cumulative flood exceedances",
+            f"{safe_int(summary.get('CUMULATIVE_FLOOD_EXCEEDANCES'), 0)}",
+        )
+        metrics[2].metric("Peak scour index", fmt(summary.get("MAX_SCOUR_INDEX"), 2))
+        metrics[3].metric("Mean monsoon anomaly", fmt(summary.get("MEAN_MONSOON_ANOMALY"), 2))
+        metrics[4].metric("Cyclone-flagged years", f"{safe_int(summary.get('CYCLONE_YEARS'), 0)}")
+        recent = st.columns(4)
+        recent[0].metric("Last 5y mean rainfall", fmt_mm(summary.get("RECENT_5Y_RAINFALL_MM")))
+        recent[1].metric("Last 5y flood seasons", f"{safe_int(summary.get('RECENT_5Y_FLOODS'), 0)}")
+        recent[2].metric("Last 5y monsoon anomaly", fmt(summary.get("RECENT_5Y_ANOMALY"), 2))
+        recent[3].metric("Max seasonal rainfall", fmt_mm(summary.get("MAX_RAINFALL_MM")))
+
+        annual = climate.get("annual", pd.DataFrame())
+        if annual is not None and not annual.empty:
+            figure = go.Figure()
+            figure.add_trace(
+                go.Bar(
+                    x=annual["YEAR"],
+                    y=annual["SEASONAL_RAINFALL_MM"],
+                    name="Seasonal rainfall (mm)",
+                    marker_color="#0e7490",
+                    hovertemplate="%{x}: %{y:.0f} mm<extra></extra>",
+                )
+            )
+            figure.add_trace(
+                go.Scatter(
+                    x=annual["YEAR"],
+                    y=annual["MONSOON_ANOMALY"],
+                    name="Monsoon anomaly (σ)",
+                    mode="lines+markers",
+                    line={"color": "#dc2626", "width": 2},
+                    yaxis="y2",
+                    hovertemplate="%{x}: %{y:+.2f} σ<extra></extra>",
+                )
+            )
+            figure.update_layout(
+                height=380,
+                template="plotly_white",
+                title="Annual rainfall and monsoon anomaly since construction",
+                xaxis_title="Year",
+                yaxis={"title": "Rainfall (mm)"},
+                yaxis2={
+                    "title": "Monsoon anomaly (σ)",
+                    "overlaying": "y",
+                    "side": "right",
+                    "zeroline": True,
+                },
+                legend={"orientation": "h", "y": 1.12},
+                margin={"l": 10, "r": 10, "t": 60, "b": 10},
+            )
+            render_plotly(figure)
+            render_dataframe(
+                annual.rename(
+                    columns={
+                        "SEASONAL_RAINFALL_MM": "Rainfall (mm)",
+                        "MONSOON_ANOMALY": "Monsoon anomaly (σ)",
+                        "PEAK_DISCHARGE_M3S": "Peak discharge (m³/s)",
+                        "PEAK_SCOUR_INDEX": "Peak scour index",
+                        "FLOOD_EXCEEDANCE": "Flood exceedance",
+                        "CYCLONE_FLAG": "Cyclone year",
+                    }
+                ),
+                height=280,
+            )
+        else:
+            st.info("No district climate history is stored for this bridge.")
+
+        districts = weather.get("districts", pd.DataFrame())
+        if isinstance(districts, pd.DataFrame) and not districts.empty:
+            live = districts.loc[
+                districts["STATE"].astype(str).eq(str(bridge_row.get("STATE", "")))
+                & districts["DISTRICT"].astype(str).eq(str(bridge_row.get("DISTRICT", "")))
+            ]
+            if not live.empty:
+                row = live.iloc[0]
+                st.markdown("##### Live district weather")
+                live_metrics = st.columns(4)
+                live_metrics[0].metric("Rainfall 24h", fmt_mm(row.get("RAINFALL_24H_MM")))
+                live_metrics[1].metric("Rainfall 72h", fmt_mm(row.get("RAINFALL_72H_MM")))
+                live_metrics[2].metric("Alert level", str(row.get("ALERT_LEVEL", "—")))
+                live_metrics[3].metric("Source", str(row.get("SOURCE", "—")))
+                st.caption(str(row.get("WEATHER_LABEL", "")) + " · " + str(row.get("IMD_HEADLINE", "")))
+
+    with inspector_tab:
+        current_column, previous_column = st.columns(2)
+        with current_column:
+            st.markdown("##### Current inspector")
+            st.markdown(
+                f"**{ledger_row.get('CURRENT_INSPECTOR_NAME', 'Not recorded')}**  \n"
+                f"{ledger_row.get('CURRENT_INSPECTOR_DESIGNATION', 'Engineer')} · "
+                f"seniority rank **#{safe_int(ledger_row.get('CURRENT_INSPECTOR_SENIORITY_RANK'), 0)}**  \n"
+                f"EMP-ID: `{ledger_row.get('CURRENT_INSPECTOR_ID', '—')}`  \n"
+                f"Phone: [{ledger_row.get('CURRENT_INSPECTOR_PHONE', '—')}](tel:{ledger_row.get('CURRENT_INSPECTOR_PHONE', '')})  \n"
+                f"Email: `{ledger_row.get('CURRENT_INSPECTOR_EMAIL', '—')}`  \n"
+                f"Last inspection: **{ledger_row.get('LAST_INSPECTION_DATE', '—')}** · "
+                f"{ledger_row.get('LAST_INSPECTION_METHOD', '—')}"
+            )
+        with previous_column:
+            st.markdown("##### Previous inspector")
+            st.markdown(
+                f"**{ledger_row.get('PREVIOUS_INSPECTOR_NAME', 'Not recorded')}**  \n"
+                f"{ledger_row.get('PREVIOUS_INSPECTOR_DESIGNATION', 'Engineer')} · "
+                f"seniority rank **#{safe_int(ledger_row.get('PREVIOUS_INSPECTOR_SENIORITY_RANK'), 0)}**  \n"
+                f"EMP-ID: `{ledger_row.get('PREVIOUS_INSPECTOR_ID', '—')}`  \n"
+                f"Phone: [{ledger_row.get('PREVIOUS_INSPECTOR_PHONE', '—')}](tel:{ledger_row.get('PREVIOUS_INSPECTOR_PHONE', '')})  \n"
+                f"Email: `{ledger_row.get('PREVIOUS_INSPECTOR_EMAIL', '—')}`"
+            )
+
+        st.markdown("##### Exact inspector remarks")
+        st.info(str(ledger_row.get("INSPECTOR_REMARKS", "No remarks recorded.")))
+
+        history = inspection_history_for_bridge(
+            inventory,
+            runtime.get("inspections"),
+            ledger,
+            bridge_id,
+        )
+        st.markdown("##### Full inspection and inspector chain")
+        if history.empty:
+            st.caption("No inspection history is available for this bridge.")
+        else:
+            render_dataframe(
+                history.rename(
+                    columns={
+                        "YEAR": "Year",
+                        "CONDITION": "Reported condition (0–9)",
+                        "METHOD": "Method",
+                        "INSPECTOR_NAME": "Inspector",
+                        "INSPECTOR_ID": "EMP-ID",
+                        "INSPECTOR_DESIGNATION": "Designation",
+                        "INSPECTOR_RANK": "Seniority rank",
+                        "INSPECTOR_PHONE": "Phone",
+                        "INSPECTOR_EMAIL": "Email",
+                        "RECORD_TYPE": "Record",
+                    }
+                ),
+                height=320,
+            )
+
+        path, generated = attachment_for_bridge(runtime, ledger, bridge_id)
+        if path is not None and path.exists():
+            try:
+                st.download_button(
+                    "Download inspection report / signed receipt",
+                    data=path.read_bytes(),
+                    file_name=path.name,
+                    mime=_mime_for(path),
+                    key=f"dossier_download_{safe_filename(bridge_id)}",
+                    use_container_width=True,
+                )
+                st.caption(
+                    ("Generated default inspection receipt" if generated else "Uploaded inspection attachment")
+                    + f" · `{path}`"
+                )
+            except Exception as exc:
+                st.error(f"Attachment could not be read: {type(exc).__name__}: {exc}")
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if np.isfinite(number) else None
+
+
 def render_audit_tab(
     runtime: Mapping[str, Any],
     ledger: pd.DataFrame,
     audit_table: pd.DataFrame,
+    scope_bridges: pd.DataFrame | None = None,
+    weather: Mapping[str, Any] | None = None,
+    queue: pd.DataFrame | None = None,
 ) -> None:
     st.markdown("#### Zero-Trust Vigilance & Paper-Inspection Audit Queue")
     st.caption(
@@ -970,16 +1601,57 @@ def render_audit_tab(
         st.error("No audit findings are available.")
         return
 
+    open_bridge = str(st.session_state.get("audit_dossier_bridge", "") or "")
+    if open_bridge:
+        open_match = audit_table.loc[
+            audit_table["BRIDGE_ID"].astype(str).eq(open_bridge)
+        ]
+        if not open_match.empty:
+            header = st.columns([4.5, 1])
+            header[0].markdown(f"### Open explainability dossier · `{open_bridge}`")
+            if header[1].button(
+                "Close dossier & return to queue",
+                key="close_audit_dossier",
+                use_container_width=True,
+            ):
+                st.session_state["audit_dossier_bridge"] = ""
+                st.session_state["audit_table_nonce"] = (
+                    int(st.session_state.get("audit_table_nonce", 0)) + 1
+                )
+                st.rerun()
+            queue_row = None
+            if queue is not None and not queue.empty:
+                queue_match = queue.loc[
+                    queue["BRIDGE_ID"].astype(str).eq(open_bridge)
+                ]
+                queue_row = queue_match.iloc[0].to_dict() if not queue_match.empty else None
+            _render_bridge_dossier(
+                runtime,
+                ledger,
+                open_match.iloc[0].to_dict(),
+                scope_bridges=scope_bridges,
+                weather=weather,
+                queue_row=queue_row,
+            )
+            return
+
+    st.markdown("### Audit queue")
     flag_columns = st.columns(4)
     flagged_only = flag_columns[0].toggle("Flagged bridges only", value=False, key="audit_flagged_only")
+    state_options = ["All"] + sorted(
+        audit_table["STATE"].dropna().astype(str).unique().tolist()
+    )
+    ensure_select_state("audit_state_filter", state_options)
     state_filter = flag_columns[1].selectbox(
         "State",
-        ["All"] + sorted(audit_table["STATE"].dropna().astype(str).unique().tolist()),
+        state_options,
         key="audit_state_filter",
     )
+    priority_options = ["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    ensure_select_state("audit_priority_filter", priority_options)
     priority_filter = flag_columns[2].selectbox(
         "Audit Priority",
-        ["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"],
+        priority_options,
         key="audit_priority_filter",
     )
     search = flag_columns[3].text_input(
@@ -1021,40 +1693,40 @@ def render_audit_tab(
     )
 
     audit_display = _audit_display(filtered)
-    render_dataframe(audit_display.style.apply(_style_audit_rows, axis=1), height=480)
+    styled = audit_display.style.apply(_style_audit_rows, axis=1)
+    table_key = f"audit_table_select_{int(st.session_state.get('audit_table_nonce', 0))}"
+    clicked_rows = selectable_table(styled, table_key, height=420)
+    st.caption(
+        "Tick the checkbox on the left of any row (or click the row) to open its full "
+        "dossier at the top of this tab: map, weather, SHAP, and inspector history."
+    )
+
+    if clicked_rows and 0 <= int(clicked_rows[0]) < len(filtered):
+        clicked_id = str(filtered.iloc[int(clicked_rows[0])]["BRIDGE_ID"])
+        if clicked_id != str(st.session_state.get("audit_dossier_bridge", "")):
+            st.session_state["audit_dossier_bridge"] = clicked_id
+            st.session_state["auth_selected_bridge"] = clicked_id
+            st.rerun()
+
     options = filtered["BRIDGE_ID"].astype(str).tolist()
     preferred = st.session_state.get("auth_selected_bridge")
     default_index = options.index(preferred) if preferred in options else 0
     ensure_select_state("audit_bridge_select", options, default_index)
-    selected = st.selectbox(
-        "Select a flagged bridge for accountability review",
+    selection_columns = st.columns([2.6, 1])
+    selected = selection_columns[0].selectbox(
+        "Or choose a bridge explicitly",
         options,
         key="audit_bridge_select",
     )
-    st.session_state["auth_selected_bridge"] = str(selected)
-    row = filtered.loc[filtered["BRIDGE_ID"].astype(str).eq(str(selected))].iloc[0]
-
-    comparison = st.columns(4)
-    comparison[0].metric(
-        "Inspector's Claimed Rating",
-        f"{int(row.get('REPORTED_LAST_MIN_COND', 0))} / 9",
-    )
-    comparison[1].metric(
-        "Physics-Implied Condition",
-        f"{fmt(row.get('PHYSICS_EXPECTED_CONDITION'), 2)} / 9",
-        help="9 × S(t0 + 5 | t0), a monotone NBI-scale survival proxy.",
-    )
-    comparison[2].metric("Condition Gap", f"{fmt(row.get('CONDITION_GAP'), 2)} points")
-    comparison[3].metric(
-        "IsolationForest",
-        "ANOMALY" if bool(row.get("ISOLATION_FLAG", False)) else "NORMAL",
-    )
-    if bool(row.get("PAPER_INSPECTION_SUSPECT", False)):
-        st.error(
-            "ZERO-TRUST ALERT: the reported healthy rating contradicts the "
-            "physics-implied five-year survival of this bridge."
-        )
-    _render_accountability_card(runtime, ledger, {**row.to_dict(), "STATE": row.get("STATE"), "DISTRICT": row.get("DISTRICT")})
+    if selection_columns[1].button(
+        "Open full dossier",
+        key="open_audit_dossier_button",
+        type="primary",
+        use_container_width=True,
+    ):
+        st.session_state["audit_dossier_bridge"] = str(selected)
+        st.session_state["auth_selected_bridge"] = str(selected)
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -1271,7 +1943,10 @@ def _archetype_records(runtime: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return records[:3]
 
 
-def render_benchmarks_tab(runtime: Mapping[str, Any]) -> None:
+def render_benchmarks_tab(
+    runtime: Mapping[str, Any],
+    visible_ids: set[str] | None = None,
+) -> None:
     st.markdown("#### Landmark Indian Collapse Benchmarks & Model Health")
     st.caption(
         "Hydraulic failure dominates the Indian bridge portfolio. These landmarks "
@@ -1279,8 +1954,17 @@ def render_benchmarks_tab(runtime: Mapping[str, Any]) -> None:
         "physics-implied collapse risk."
     )
     records = _archetype_records(runtime)
+    if visible_ids is not None:
+        records = [
+            record
+            for record in records
+            if str(record.get("bridge_id", "")) in visible_ids
+        ]
     if not records:
-        st.warning("Landmark archetype scorecards are unavailable.")
+        st.info(
+            "No landmark archetype falls inside this account's jurisdiction. "
+            "Tenant isolation hides out-of-scope benchmarks."
+        )
     else:
         columns = st.columns(len(records))
         for column, record in zip(columns, records, strict=False):
@@ -1455,46 +2139,8 @@ def main() -> None:
     _init_state()
     runtime = get_runtime(str(ROOT))
 
-    with st.sidebar:
-        st.markdown("### Operational Role")
-        role = st.radio(
-            "Select portal",
-            ("Field Inspector Portal", "NHAI / State PWD Command Center"),
-            key="portal_role",
-            label_visibility="collapsed",
-        )
-        st.caption(
-            "Portal A is blind by design. Portal B is the executive, vigilance and "
-            "meteorological command view."
-        )
-        st.divider()
-        st.markdown("### Live Meteorology")
-        weather = st.session_state.get("live_weather")
-        if weather:
-            districts = weather.get("districts", pd.DataFrame())
-            n_alerts = (
-                int(districts["EXCEEDS_THRESHOLD"].astype(bool).sum())
-                if districts is not None and not districts.empty
-                else 0
-            )
-            st.metric("Active flood alerts", n_alerts)
-            st.caption(f"Last sync: {sync_label(weather.get('synced_at'))}")
-            if weather.get("offline"):
-                st.caption("Offline-safe fallback active.")
-        else:
-            st.caption("Not synced yet. Open the Command Center to fetch live weather.")
-        st.divider()
-        st.caption(
-            "Persistence: `artifacts/inspections_live_ledger.parquet` · "
-            "uploads: `artifacts/uploads/<bridge_id>/`"
-        )
-        st.caption(
-            "All scoring is read-only against the persisted classical ML artefacts; "
-            "no deep-learning framework is used."
-        )
-
-    bridges = runtime.get("bridges")
-    if bridges is None or bridges.empty:
+    bridges_all = runtime.get("bridges")
+    if bridges_all is None or bridges_all.empty:
         st.error(
             "The persisted bridge inventory `artifacts/data/bridges.parquet` could not be loaded."
         )
@@ -1504,20 +2150,135 @@ def main() -> None:
                     st.warning(error)
         st.stop()
 
-    ledger = load_or_create_ledger(bridges, runtime.get("inspections"))
-    st.caption(f"Persistent inspector ledger: `{ledger_signature()}` · {len(ledger):,} records")
+    states = sorted(bridges_all["STATE"].dropna().astype(str).unique().tolist())
+    accounts = build_demo_accounts(states)
+
+    account = st.session_state.get("auth_user")
+    if not account:
+        st.markdown(
+            '<style>[data-testid="stSidebar"]{display:none;}</style>',
+            unsafe_allow_html=True,
+        )
+        render_login(accounts)
+        return
+
+    bridges_all = bridges_all.copy()
+    bridges_all["BRIDGE_ID"] = bridges_all["BRIDGE_ID"].astype(str)
+    visible_ids = scope_bridge_ids(bridges_all, account)
+    if not visible_ids:
+        st.error(
+            f"No bridges are provisioned for {account.get('SCOPE_LABEL', 'this account')}. "
+            "Tenant isolation prevents access to any other jurisdiction."
+        )
+        if st.button("Sign out", type="primary"):
+            for key in ("auth_user", "portal_role", "inspector_receipt"):
+                st.session_state.pop(key, None)
+            st.rerun()
+        return
+
+    scope_bridges = bridges_all.loc[bridges_all["BRIDGE_ID"].isin(visible_ids)].copy()
+
+    role_locked = str(account.get("ROLE", "")).upper() == "INSPECTOR"
+
+    with st.sidebar:
+        render_signed_in_user(account)
+        st.markdown("### Operational Role")
+        if role_locked:
+            try:
+                st.radio(
+                    "Select portal",
+                    ("Field Inspector Portal", "NHAI / State PWD Command Center"),
+                    index=0,
+                    key="inspector_locked_role",
+                    disabled=True,
+                    label_visibility="collapsed",
+                )
+            except TypeError:
+                st.markdown(
+                    '<div class="zt-role-locked">● Field Inspector Portal<br>'
+                    "○ NHAI / State PWD Command Center (not authorised for this EMP-ID)</div>",
+                    unsafe_allow_html=True,
+                )
+            role = "Field Inspector Portal"
+            st.caption(
+                "Inspector EMP-IDs are confined to the blind field-submission portal. "
+                "Command functions are not provisioned for this role."
+            )
+        else:
+            role = st.radio(
+                "Select portal",
+                ("Field Inspector Portal", "NHAI / State PWD Command Center"),
+                index=1,
+                key="portal_role",
+                label_visibility="collapsed",
+            )
+            st.caption(
+                "Command EMP-IDs can perform field submissions and the executive, "
+                "vigilance and meteorological review."
+            )
+        st.caption(f"Jurisdiction: **{account.get('SCOPE_LABEL', '')}**")
+        st.divider()
+        st.markdown("### Live Meteorology")
+        weather_state = st.session_state.get("live_weather")
+        if weather_state:
+            districts = weather_state.get("districts", pd.DataFrame())
+            n_alerts = (
+                int(districts["EXCEEDS_THRESHOLD"].astype(bool).sum())
+                if districts is not None and not districts.empty
+                else 0
+            )
+            st.metric("Active flood alerts", n_alerts)
+            st.caption(f"Last sync: {sync_label(weather_state.get('synced_at'))}")
+            if weather_state.get("offline"):
+                st.caption("Offline-safe fallback active.")
+        else:
+            st.caption("Not synced yet. Open the Command Center to fetch live weather.")
+        st.divider()
+        st.caption(
+            "Persistence: `artifacts/inspections_live_ledger.parquet` · "
+            "uploads: `artifacts/uploads/<bridge_id>/`"
+        )
+        if st.button("Sign out", key="sign_out_button", use_container_width=True):
+            for key in (
+                "auth_user",
+                "portal_role",
+                "portal_role_inspector",
+                "login_emp",
+                "login_pwd",
+                "inspector_receipt",
+                "active_events",
+                "live_triage",
+                "live_weather",
+                "last_weather_sync",
+                "event_notice",
+                "auth_selected_bridge",
+                "audit_dossier_bridge",
+                "audit_table_nonce",
+                "audit_bridge_select",
+                "queue_bridge_select",
+                "deep_dive_bridge",
+                "inspector_bridge_select",
+                "inspector_locked_role",
+            ):
+                st.session_state.pop(key, None)
+            st.rerun()
+
+    ledger_all = load_or_create_ledger(bridges_all, runtime.get("inspections"))
+    if role_locked:
+        ledger_all = apply_inspector_identity(ledger_all, account, visible_ids)
+    ledger = ledger_all.loc[ledger_all["BRIDGE_ID"].astype(str).isin(visible_ids)].copy()
 
     if role == "Field Inspector Portal":
-        render_inspector_portal(runtime, ledger)
+        render_inspector_portal(runtime, ledger_all, account, visible_ids)
         return
 
     st.markdown(
         '<div class="zt-hero">'
         '<div class="zt-kicker">Portal B · NHAI / MoRTH / State PWD</div>'
-        '<h1>Command, Vigilance & Live Flash-Flood Triage</h1>'
-        '<p>Executive transparency across the bridge portfolio: live meteorology, '
-        'physics-implied survival, zero-trust audit, revised RUL rankings and SHAP '
-        'explanations.</p>'
+        f'<h1>Command, Vigilance &amp; Live Flash-Flood Triage</h1>'
+        f'<p>{account.get("SCOPE_LABEL", "")}. Executive transparency within this '
+        'jurisdiction only: live meteorology, physics-implied survival, zero-trust '
+        'audit, revised RUL rankings and SHAP explanations.</p>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -1527,22 +2288,55 @@ def main() -> None:
             for error in runtime["errors"]:
                 st.warning(error)
 
-    weather = sync_weather(runtime)
-    audit_table = cached_audit_table(
+    weather = sync_weather(runtime, scope_bridges)
+    audit_full = cached_audit_table(
         str(ROOT), ledger_signature(), audit_overlay_signature()
     )
+    audit_table = (
+        audit_full.loc[audit_full["BRIDGE_ID"].astype(str).isin(visible_ids)].copy()
+        if audit_full is not None and not audit_full.empty
+        else pd.DataFrame()
+    )
+    if not audit_table.empty:
+        audit_table = audit_table.sort_values(
+            ["AUDIT_Z_SCORE", "BRIDGE_ID"], ascending=[False, True], kind="mergesort"
+        ).reset_index(drop=True)
+        audit_table["AUDIT_QUEUE_RANK"] = np.arange(1, len(audit_table) + 1)
+
     active_events = list(st.session_state.get("active_events", []))
     live_triage = st.session_state.get("live_triage", pd.DataFrame())
-    queue = build_master_queue(
+    if isinstance(live_triage, pd.DataFrame) and not live_triage.empty:
+        live_triage = live_triage.loc[
+            live_triage["BRIDGE_ID"].astype(str).isin(visible_ids)
+        ]
+    queue_full = build_master_queue(
         runtime,
-        ledger,
-        audit_table,
+        ledger_all,
+        audit_full,
         events=active_events,
         live_triage=live_triage,
     )
+    queue = (
+        queue_full.loc[queue_full["BRIDGE_ID"].astype(str).isin(visible_ids)].copy()
+        if queue_full is not None and not queue_full.empty
+        else pd.DataFrame()
+    )
+    if not queue.empty:
+        queue = queue.sort_values(
+            ["TRIAGE_PRIORITY_SCORE", "RUL_LOSS_YEARS", "BRIDGE_ID"],
+            ascending=[False, False, True],
+            kind="mergesort",
+        ).reset_index(drop=True)
+        queue["RANK"] = np.arange(1, len(queue) + 1, dtype=np.int32)
+
+    st.caption(
+        f"Jurisdiction: **{account.get('SCOPE_LABEL', '')}** · "
+        f"{len(scope_bridges):,} bridges in scope · "
+        f"persistent ledger `{ledger_signature()}`"
+    )
 
     quick = st.columns(4)
-    quick[0].metric("Bridges Monitored", f"{len(queue):,}" if not queue.empty else f"{len(bridges):,}")
+    quick[0].metric("Bridges Monitored", f"{len(queue) if not queue.empty else len(scope_bridges):,}")
     quick[1].metric(
         "Critical Triage",
         f"{int(queue['TRIAGE_PRIORITY'].eq('CRITICAL').sum()):,}" if not queue.empty else "0",
@@ -1573,13 +2367,20 @@ def main() -> None:
         ]
     )
     with tabs[0]:
-        render_live_queue_tab(runtime, ledger, queue, weather)
+        render_live_queue_tab(runtime, ledger, queue, weather, scope_bridges)
     with tabs[1]:
-        render_audit_tab(runtime, ledger, audit_table)
+        render_audit_tab(
+            runtime,
+            ledger,
+            audit_table,
+            scope_bridges=scope_bridges,
+            weather=weather,
+            queue=queue,
+        )
     with tabs[2]:
         render_deep_dive_tab(runtime, queue, ledger)
     with tabs[3]:
-        render_benchmarks_tab(runtime)
+        render_benchmarks_tab(runtime, visible_ids)
 
     st.divider()
     st.caption(

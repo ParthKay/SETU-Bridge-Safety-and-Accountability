@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Final, Iterable, Mapping, Sequence
 
 import joblib
 import numpy as np
@@ -127,6 +127,41 @@ REMARKS_LOW = (
     "Deck slab exhibits structural cracking; restricted loading recommended.",
     "Substructure movement detected; detailed NDT and load assessment required.",
 )
+
+# ---------------------------------------------------------------------------
+# Authentication / tenancy constants
+# ---------------------------------------------------------------------------
+
+DEMO_INSPECTOR_PASSWORD = "Field@2026"
+DEMO_COMMAND_PASSWORD = "Command@2026"
+
+DESIGNATIONS: Final[tuple[str, ...]] = (
+    "Junior Engineer",
+    "Assistant Engineer",
+    "Assistant Executive Engineer",
+    "Executive Engineer",
+    "Superintending Engineer",
+    "Chief Engineer",
+)
+
+STATE_CODES: Final[dict[str, str]] = {
+    "ANDHRA PRADESH": "AP",
+    "ASSAM": "ASM",
+    "BIHAR": "BIH",
+    "GUJARAT": "GUJ",
+    "HIMACHAL PRADESH": "HP",
+    "KARNATAKA": "KAR",
+    "KERALA": "KER",
+    "MADHYA PRADESH": "MP",
+    "MAHARASHTRA": "MAH",
+    "MEGHALAYA": "MEG",
+    "ODISHA": "ODI",
+    "RAJASTHAN": "RAJ",
+    "TAMIL NADU": "TN",
+    "TRIPURA": "TRI",
+    "UTTARAKHAND": "UKD",
+    "WEST BENGAL": "WBL",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +267,193 @@ def display_feature_name(feature: str) -> str:
             value = text[len(prefix):].replace("___MISSING__", "not reported")
             return f"{label}: {value}"
     return text
+
+
+# ---------------------------------------------------------------------------
+# Demo identity, authentication and tenant isolation
+# ---------------------------------------------------------------------------
+
+
+def _normalise_state(value: Any) -> str:
+    return str(value).strip()
+
+
+def _state_code(state: str) -> str:
+    normalised = _normalise_state(state).upper()
+    if normalised in STATE_CODES:
+        return STATE_CODES[normalised]
+    token = re.sub(r"[^A-Za-z]", "", normalised)
+    return token[:3].upper() if token else "IND"
+
+
+def _agency_series(bridges: pd.DataFrame) -> np.ndarray:
+    """Derive the managing-agency label used for access-control decisions."""
+
+    owner = (
+        bridges.get("OWNER", pd.Series("", index=bridges.index))
+        .fillna("")
+        .astype(str)
+        .str.upper()
+    )
+    return np.select(
+        [
+            owner.str.contains("NHAI", regex=False),
+            owner.str.contains("PWD", regex=False),
+            owner.str.contains("BRO", regex=False),
+            owner.str.contains("MUNICIPAL", regex=False),
+            owner.str.contains("RAIL", regex=False),
+        ],
+        ["NHAI", "State PWD", "BRO", "Municipal Corporation", "Railways"],
+        default="Other",
+    ).astype(str)
+
+
+def _identity_from_seed(seed: str) -> dict[str, Any]:
+    """Return a deterministic Indian engineering identity for a seed string."""
+
+    digest = int(
+        pd.util.hash_pandas_object(pd.Series([str(seed)]), index=False).iloc[0]
+    )
+    first = FIRST_NAMES[digest % len(FIRST_NAMES)]
+    last = LAST_NAMES[(digest >> 7) % len(LAST_NAMES)]
+    designation = DESIGNATIONS[(digest >> 13) % len(DESIGNATIONS)]
+    phone = f"+91-98{digest % 100_000_000:08d}"
+    email_local = f"{first.lower()}.{last.lower()}.{digest % 9000 + 1000}"
+    return {
+        "name": f"{first} {last}",
+        "designation": str(designation),
+        "seniority_rank": int((digest >> 17) % 40) + 2,
+        "phone": phone,
+        "email": email_local,
+    }
+
+
+def build_demo_accounts(states: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """Create inspector and command-centre demo logins for every data state.
+
+    One blind field inspector and one State-PWD command centre are created for
+    each state present in the persisted inventory, plus a single national NHAI
+    command centre.  Every account carries the exact tenant scope that the UI
+    enforces: a Bihar PWD command centre can never read another state.
+    """
+
+    ordered = sorted({_normalise_state(state) for state in states if _normalise_state(state)})
+    accounts: dict[str, dict[str, Any]] = {}
+    for index, state in enumerate(ordered):
+        code = _state_code(state)
+        inspector_emp = f"INS-{code}-{101 + index:03d}"
+        inspector = _identity_from_seed(f"{state}|inspector")
+        accounts[inspector_emp] = {
+            "EMP_ID": inspector_emp,
+            "PASSWORD": DEMO_INSPECTOR_PASSWORD,
+            "ROLE": "INSPECTOR",
+            "NAME": inspector["name"],
+            "DESIGNATION": inspector["designation"],
+            "SENIORITY_RANK": inspector["seniority_rank"],
+            "PHONE": inspector["phone"],
+            "EMAIL": f"{inspector['email']}@pwd.gov.in",
+            "STATE": state,
+            "AGENCY": "State PWD",
+            "SCOPE_LABEL": f"{state} · State PWD field cadre",
+        }
+        command_emp = f"PWD-{code}-CMD"
+        command = _identity_from_seed(f"{state}|command")
+        accounts[command_emp] = {
+            "EMP_ID": command_emp,
+            "PASSWORD": DEMO_COMMAND_PASSWORD,
+            "ROLE": "COMMAND",
+            "NAME": command["name"],
+            "DESIGNATION": "Chief Engineer",
+            "SENIORITY_RANK": 1,
+            "PHONE": command["phone"],
+            "EMAIL": f"{command['email']}@pwd.gov.in",
+            "STATE": state,
+            "AGENCY": "State PWD",
+            "SCOPE_LABEL": f"{state} · State PWD command centre",
+        }
+
+    nhai = _identity_from_seed("India|NHAI|command")
+    accounts["NHAI-CMD-01"] = {
+        "EMP_ID": "NHAI-CMD-01",
+        "PASSWORD": DEMO_COMMAND_PASSWORD,
+        "ROLE": "COMMAND",
+        "NAME": nhai["name"],
+        "DESIGNATION": "Chief General Manager",
+        "SENIORITY_RANK": 1,
+        "PHONE": nhai["phone"],
+        "EMAIL": f"{nhai['email']}@nhai.gov.in",
+        "STATE": "",
+        "AGENCY": "NHAI",
+        "SCOPE_LABEL": "NHAI · National Highways only",
+    }
+    return accounts
+
+
+def authenticate(
+    emp_id: str,
+    password: str,
+    accounts: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Return the matching demo account or ``None`` for invalid credentials."""
+
+    key = str(emp_id).strip().upper()
+    account = accounts.get(key)
+    if account is None:
+        return None
+    if str(password) != str(account.get("PASSWORD", "")):
+        return None
+    return dict(account)
+
+
+def scope_bridge_ids(bridges: pd.DataFrame, account: Mapping[str, Any]) -> set[str]:
+    """Return the bridge identifiers a signed-in account is allowed to see."""
+
+    if bridges is None or bridges.empty or "BRIDGE_ID" not in bridges.columns:
+        return set()
+    ids = bridges["BRIDGE_ID"].astype(str)
+    agency = _agency_series(bridges)
+    role = str(account.get("ROLE", "")).upper()
+    state = _normalise_state(account.get("STATE", ""))
+    account_agency = str(account.get("AGENCY", ""))
+
+    mask = np.ones(len(bridges), dtype=bool)
+    if account_agency == "NHAI":
+        mask &= agency == "NHAI"
+    else:
+        if state:
+            mask &= bridges["STATE"].astype(str).map(_normalise_state).to_numpy() == state
+        if role == "INSPECTOR":
+            mask &= agency == "State PWD"
+    return set(ids.to_numpy()[mask].tolist())
+
+
+def apply_inspector_identity(
+    ledger: pd.DataFrame,
+    account: Mapping[str, Any],
+    bridge_ids: Iterable[str],
+) -> pd.DataFrame:
+    """Bind a signed-in inspector to every bridge in their assigned scope."""
+
+    output = ledger.copy()
+    visible = {str(value) for value in bridge_ids}
+    if output.empty or not visible:
+        return output
+    mask = output["BRIDGE_ID"].astype(str).isin(visible)
+    if not mask.any():
+        return output
+    output.loc[mask, "CURRENT_INSPECTOR_NAME"] = str(account.get("NAME", ""))
+    output.loc[mask, "CURRENT_INSPECTOR_ID"] = str(account.get("EMP_ID", ""))
+    output.loc[mask, "CURRENT_INSPECTOR_PHONE"] = str(account.get("PHONE", ""))
+    output.loc[mask, "CURRENT_INSPECTOR_EMAIL"] = str(account.get("EMAIL", ""))
+    if "CURRENT_INSPECTOR_DESIGNATION" in output.columns:
+        output.loc[mask, "CURRENT_INSPECTOR_DESIGNATION"] = str(
+            account.get("DESIGNATION", "")
+        )
+    if "CURRENT_INSPECTOR_SENIORITY_RANK" in output.columns:
+        output.loc[mask, "CURRENT_INSPECTOR_SENIORITY_RANK"] = int(
+            _coerce_float(account.get("SENIORITY_RANK"), 1)
+        )
+    return output
 
 
 # ---------------------------------------------------------------------------
@@ -941,6 +1163,10 @@ def _seeded_ledger(bridges: pd.DataFrame, inspections: pd.DataFrame | None) -> p
         f"{first.lower()}.{last.lower()}.{int(value) % 9000 + 1000}"
         for first, last, value in zip(previous_first, previous_last, h_prev, strict=False)
     ]
+    current_designation = _pick(DESIGNATIONS, h_cur >> np.uint64(13))
+    previous_designation = _pick(DESIGNATIONS, h_prev >> np.uint64(13))
+    current_rank = ((h_cur >> np.uint64(17)) % np.uint64(40) + 2).astype(int)
+    previous_rank = ((h_prev >> np.uint64(17)) % np.uint64(40) + 2).astype(int)
 
     reported = pd.to_numeric(
         inventory.get("REPORTED_LAST_MIN_COND", pd.Series(6, index=inventory.index)),
@@ -970,6 +1196,8 @@ def _seeded_ledger(bridges: pd.DataFrame, inspections: pd.DataFrame | None) -> p
             "CURRENT_INSPECTOR_EMAIL": [
                 f"{local}@{domain}" for local, domain in zip(current_local, domains, strict=False)
             ],
+            "CURRENT_INSPECTOR_DESIGNATION": current_designation,
+            "CURRENT_INSPECTOR_SENIORITY_RANK": current_rank,
             "PREVIOUS_INSPECTOR_NAME": [
                 f"{first} {last}" for first, last in zip(previous_first, previous_last, strict=False)
             ],
@@ -978,6 +1206,8 @@ def _seeded_ledger(bridges: pd.DataFrame, inspections: pd.DataFrame | None) -> p
             "PREVIOUS_INSPECTOR_EMAIL": [
                 f"{local}@{domain}" for local, domain in zip(previous_local, domains, strict=False)
             ],
+            "PREVIOUS_INSPECTOR_DESIGNATION": previous_designation,
+            "PREVIOUS_INSPECTOR_SENIORITY_RANK": previous_rank,
             "INSPECTOR_REMARKS": remarks,
             "ATTACHMENT_PATH": "",
             "SUBMISSION_COUNT": np.zeros(n, dtype=np.int32),
@@ -1046,6 +1276,7 @@ def record_inspection_submission(
     remarks: str,
     upload_name: str | None,
     upload_bytes: bytes | None,
+    inspector: Mapping[str, Any] | None = None,
     root: Path = ROOT,
     path: Path = LEDGER_PATH,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -1078,8 +1309,37 @@ def record_inspection_submission(
         "PREVIOUS_INSPECTOR_PHONE": output.at[index, "CURRENT_INSPECTOR_PHONE"],
         "PREVIOUS_INSPECTOR_EMAIL": output.at[index, "CURRENT_INSPECTOR_EMAIL"],
     }
-    for column, value in previous.items():
-        output.at[index, column] = value
+    if "CURRENT_INSPECTOR_DESIGNATION" in output.columns:
+        previous["PREVIOUS_INSPECTOR_DESIGNATION"] = output.at[
+            index, "CURRENT_INSPECTOR_DESIGNATION"
+        ]
+    if "CURRENT_INSPECTOR_SENIORITY_RANK" in output.columns:
+        previous["PREVIOUS_INSPECTOR_SENIORITY_RANK"] = output.at[
+            index, "CURRENT_INSPECTOR_SENIORITY_RANK"
+        ]
+    existing_id = str(output.at[index, "CURRENT_INSPECTOR_ID"])
+    incoming_id = str(inspector.get("EMP_ID", "")) if inspector else ""
+    if incoming_id:
+        if existing_id != incoming_id:
+            for column, value in previous.items():
+                if column in output.columns:
+                    output.at[index, column] = value
+        output.at[index, "CURRENT_INSPECTOR_NAME"] = str(inspector.get("NAME", ""))
+        output.at[index, "CURRENT_INSPECTOR_ID"] = incoming_id
+        output.at[index, "CURRENT_INSPECTOR_PHONE"] = str(inspector.get("PHONE", ""))
+        output.at[index, "CURRENT_INSPECTOR_EMAIL"] = str(inspector.get("EMAIL", ""))
+        if "CURRENT_INSPECTOR_DESIGNATION" in output.columns:
+            output.at[index, "CURRENT_INSPECTOR_DESIGNATION"] = str(
+                inspector.get("DESIGNATION", "")
+            )
+        if "CURRENT_INSPECTOR_SENIORITY_RANK" in output.columns:
+            output.at[index, "CURRENT_INSPECTOR_SENIORITY_RANK"] = int(
+                _coerce_float(inspector.get("SENIORITY_RANK"), 1)
+            )
+    else:
+        for column, value in previous.items():
+            if column in output.columns:
+                output.at[index, column] = value
 
     output.at[index, "REPORTED_LAST_MIN_COND"] = int(reported_condition)
     output.at[index, "REPORTED_LAST_DECK_COND"] = int(deck_condition)
@@ -1829,17 +2089,25 @@ def build_audit_table(runtime: Mapping[str, Any], ledger: pd.DataFrame) -> pd.Da
             "BRIDGE_ID",
             "MANAGING_AGENCY",
             "LAST_INSPECTION_DATE",
+            "LAST_INSPECTION_METHOD",
             "REPORTED_LAST_MIN_COND",
+            "REPORTED_LAST_DECK_COND",
+            "REPORTED_LAST_SUPERSTRUCTURE_COND",
+            "REPORTED_LAST_SUBSTRUCTURE_COND",
             "INSPECTOR_REMARKS",
             "ATTACHMENT_PATH",
             "CURRENT_INSPECTOR_NAME",
             "CURRENT_INSPECTOR_ID",
             "CURRENT_INSPECTOR_PHONE",
             "CURRENT_INSPECTOR_EMAIL",
+            "CURRENT_INSPECTOR_DESIGNATION",
+            "CURRENT_INSPECTOR_SENIORITY_RANK",
             "PREVIOUS_INSPECTOR_NAME",
             "PREVIOUS_INSPECTOR_ID",
             "PREVIOUS_INSPECTOR_PHONE",
             "PREVIOUS_INSPECTOR_EMAIL",
+            "PREVIOUS_INSPECTOR_DESIGNATION",
+            "PREVIOUS_INSPECTOR_SENIORITY_RANK",
             "SUBMISSION_COUNT",
             "LAST_SUBMISSION_AT",
             "RECEIPT_SHA256",
@@ -2037,11 +2305,18 @@ def build_master_queue(
             "BRIDGE_ID",
             "MANAGING_AGENCY",
             "LAST_INSPECTION_DATE",
+            "LAST_INSPECTION_METHOD",
             "CURRENT_INSPECTOR_NAME",
             "CURRENT_INSPECTOR_ID",
             "CURRENT_INSPECTOR_PHONE",
+            "CURRENT_INSPECTOR_EMAIL",
+            "CURRENT_INSPECTOR_DESIGNATION",
+            "CURRENT_INSPECTOR_SENIORITY_RANK",
             "PREVIOUS_INSPECTOR_NAME",
             "PREVIOUS_INSPECTOR_PHONE",
+            "PREVIOUS_INSPECTOR_EMAIL",
+            "PREVIOUS_INSPECTOR_DESIGNATION",
+            "PREVIOUS_INSPECTOR_SENIORITY_RANK",
             "ATTACHMENT_PATH",
             "SUBMISSION_COUNT",
         )
@@ -2367,6 +2642,366 @@ def attachment_for_bridge(
         return None, False
     path = _write_default_receipt(bridge_row.iloc[0].to_dict(), ledger_record, root=root)
     return path, True
+
+
+# ---------------------------------------------------------------------------
+# Explainability dossiers: climate history, inspector history and evidence
+# ---------------------------------------------------------------------------
+
+
+def climate_history_for_bridge(
+    climate: pd.DataFrame | None,
+    bridge_row: Mapping[str, Any],
+    *,
+    as_of_year: int = AS_OF_YEAR,
+) -> dict[str, Any]:
+    """Return the annual weather record for a bridge since construction."""
+
+    empty = pd.DataFrame(
+        columns=[
+            "YEAR",
+            "SEASONAL_RAINFALL_MM",
+            "MONSOON_ANOMALY",
+            "PEAK_DISCHARGE_M3S",
+            "PEAK_SCOUR_INDEX",
+            "FLOOD_EXCEEDANCE",
+            "CYCLONE_FLAG",
+        ]
+    )
+    summary: dict[str, float] = {
+        "YEARS_COVERED": 0.0,
+        "CUMULATIVE_FLOOD_EXCEEDANCES": np.nan,
+        "MAX_SCOUR_INDEX": np.nan,
+        "MEAN_MONSOON_ANOMALY": np.nan,
+        "MAX_MONSOON_ANOMALY": np.nan,
+        "MAX_RAINFALL_MM": np.nan,
+        "CYCLONE_YEARS": np.nan,
+        "RECENT_5Y_RAINFALL_MM": np.nan,
+        "RECENT_5Y_ANOMALY": np.nan,
+        "RECENT_5Y_FLOODS": np.nan,
+        "LAST_RAINFALL_MM": np.nan,
+        "LAST_ANOMALY": np.nan,
+    }
+    if climate is None or climate.empty or "DISTRICT" not in climate.columns:
+        return {"annual": empty, "summary": summary, "since_year": None}
+
+    state = _normalise_state(bridge_row.get("STATE", ""))
+    district = _normalise_state(bridge_row.get("DISTRICT", ""))
+    mask = climate["DISTRICT"].astype(str).map(_normalise_state).eq(district)
+    if state and "STATE" in climate.columns:
+        mask &= climate["STATE"].astype(str).map(_normalise_state).eq(state)
+    frame = climate.loc[mask].copy()
+    if frame.empty:
+        return {"annual": empty, "summary": summary, "since_year": None}
+
+    since_year = int(_coerce_float(bridge_row.get("YEAR_BUILT"), frame["YEAR"].min()))
+    frame["YEAR"] = pd.to_numeric(frame["YEAR"], errors="coerce")
+    frame = frame.dropna(subset=["YEAR"])
+    frame = frame.loc[frame["YEAR"].between(since_year, as_of_year)]
+    if frame.empty:
+        return {"annual": empty, "summary": summary, "since_year": since_year}
+    frame = frame.sort_values("YEAR", kind="mergesort").reset_index(drop=True)
+
+    for column, default in (
+        ("SEASONAL_RAINFALL_MM", np.nan),
+        ("MONSOON_ANOMALY", np.nan),
+        ("PEAK_DISCHARGE_M3S", np.nan),
+        ("PEAK_SCOUR_INDEX", np.nan),
+        ("FLOOD_EXCEEDANCE", 0.0),
+        ("CYCLONE_FLAG", 0.0),
+    ):
+        if column not in frame.columns:
+            frame[column] = default
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+
+    recent = frame.tail(5)
+    summary = {
+        "YEARS_COVERED": float(len(frame)),
+        "CUMULATIVE_FLOOD_EXCEEDANCES": float(frame["FLOOD_EXCEEDANCE"].fillna(0).sum()),
+        "MAX_SCOUR_INDEX": float(frame["PEAK_SCOUR_INDEX"].max()),
+        "MEAN_MONSOON_ANOMALY": float(frame["MONSOON_ANOMALY"].mean()),
+        "MAX_MONSOON_ANOMALY": float(frame["MONSOON_ANOMALY"].max()),
+        "MAX_RAINFALL_MM": float(frame["SEASONAL_RAINFALL_MM"].max()),
+        "CYCLONE_YEARS": float(frame["CYCLONE_FLAG"].fillna(0).sum()),
+        "RECENT_5Y_RAINFALL_MM": float(recent["SEASONAL_RAINFALL_MM"].mean()),
+        "RECENT_5Y_ANOMALY": float(recent["MONSOON_ANOMALY"].mean()),
+        "RECENT_5Y_FLOODS": float(recent["FLOOD_EXCEEDANCE"].fillna(0).sum()),
+        "LAST_RAINFALL_MM": float(frame["SEASONAL_RAINFALL_MM"].iloc[-1]),
+        "LAST_ANOMALY": float(frame["MONSOON_ANOMALY"].iloc[-1]),
+    }
+    annual = frame.loc[
+        :,
+        [
+            "YEAR",
+            "SEASONAL_RAINFALL_MM",
+            "MONSOON_ANOMALY",
+            "PEAK_DISCHARGE_M3S",
+            "PEAK_SCOUR_INDEX",
+            "FLOOD_EXCEEDANCE",
+            "CYCLONE_FLAG",
+        ],
+    ].copy()
+    return {"annual": annual, "summary": summary, "since_year": since_year}
+
+
+def inspection_history_for_bridge(
+    bridges: pd.DataFrame | None,
+    inspections: pd.DataFrame | None,
+    ledger: pd.DataFrame,
+    bridge_id: str,
+    *,
+    limit: int = 15,
+) -> pd.DataFrame:
+    """Return the full inspection chain, including every previous inspector."""
+
+    columns = [
+        "YEAR",
+        "CONDITION",
+        "METHOD",
+        "INSPECTOR_NAME",
+        "INSPECTOR_ID",
+        "INSPECTOR_DESIGNATION",
+        "INSPECTOR_RANK",
+        "INSPECTOR_PHONE",
+        "INSPECTOR_EMAIL",
+        "RECORD_TYPE",
+    ]
+    ledger_row = ledger.loc[ledger["BRIDGE_ID"].astype(str).eq(str(bridge_id))]
+    record = ledger_row.iloc[0].to_dict() if not ledger_row.empty else {}
+    current_identity = {
+        "name": str(record.get("CURRENT_INSPECTOR_NAME", "") or "Not assigned"),
+        "id": str(record.get("CURRENT_INSPECTOR_ID", "") or "—"),
+        "designation": str(record.get("CURRENT_INSPECTOR_DESIGNATION", "") or "Engineer"),
+        "rank": int(_coerce_float(record.get("CURRENT_INSPECTOR_SENIORITY_RANK"), 0)),
+        "phone": str(record.get("CURRENT_INSPECTOR_PHONE", "") or "—"),
+        "email": str(record.get("CURRENT_INSPECTOR_EMAIL", "") or "—"),
+    }
+
+    history: pd.DataFrame
+    if inspections is not None and not inspections.empty and "BRIDGE_ID" in inspections.columns:
+        frame = inspections.loc[inspections["BRIDGE_ID"].astype(str).eq(str(bridge_id))].copy()
+        year_column = "INSPECTION_YEAR" if "INSPECTION_YEAR" in frame.columns else None
+        if year_column is not None and not frame.empty:
+            frame[year_column] = pd.to_numeric(frame[year_column], errors="coerce")
+            frame = frame.sort_values(year_column, ascending=False, kind="mergesort")
+            frame = frame.head(max(1, int(limit))).reset_index(drop=True)
+            rows: list[dict[str, Any]] = []
+            for position, row in frame.iterrows():
+                year = int(_coerce_float(row.get(year_column), AS_OF_YEAR))
+                if position == 0:
+                    identity = current_identity
+                    record_type = "Latest / current"
+                else:
+                    seeded = _identity_from_seed(f"{bridge_id}|{year}|{position}")
+                    digest = int(
+                        pd.util.hash_pandas_object(
+                            pd.Series([f"{bridge_id}|{year}|{position}"]), index=False
+                        ).iloc[0]
+                    )
+                    identity = {
+                        "name": seeded["name"],
+                        "id": f"INS-HIST-{digest % 90_000 + 10_000:05d}",
+                        "designation": seeded["designation"],
+                        "rank": int(seeded["seniority_rank"]),
+                        "phone": seeded["phone"],
+                        "email": f"{seeded['email']}@pwd.gov.in",
+                    }
+                    record_type = "Previous"
+                ndt = _coerce_float(row.get("NDT_PERFORMED"), 0.0) > 0
+                inspection_type = str(row.get("INSPECTION_TYPE", "") or "")
+                method = "Physical NDT Performed" if ndt or "NDT" in inspection_type.upper() else "Visual Only"
+                rows.append(
+                    {
+                        "YEAR": year,
+                        "CONDITION": int(_coerce_float(row.get("REPORTED_MIN_COND"), record.get("REPORTED_LAST_MIN_COND"))),
+                        "METHOD": method,
+                        "INSPECTOR_NAME": identity["name"],
+                        "INSPECTOR_ID": identity["id"],
+                        "INSPECTOR_DESIGNATION": identity["designation"],
+                        "INSPECTOR_RANK": identity["rank"],
+                        "INSPECTOR_PHONE": identity["phone"],
+                        "INSPECTOR_EMAIL": identity["email"],
+                        "RECORD_TYPE": record_type,
+                    }
+                )
+            history = pd.DataFrame.from_records(rows, columns=columns)
+            if not history.empty:
+                return history
+
+    previous_identity = {
+        "name": str(record.get("PREVIOUS_INSPECTOR_NAME", "") or "Not recorded"),
+        "id": str(record.get("PREVIOUS_INSPECTOR_ID", "") or "—"),
+        "designation": str(record.get("PREVIOUS_INSPECTOR_DESIGNATION", "") or "Engineer"),
+        "rank": int(_coerce_float(record.get("PREVIOUS_INSPECTOR_SENIORITY_RANK"), 0)),
+        "phone": str(record.get("PREVIOUS_INSPECTOR_PHONE", "") or "—"),
+        "email": str(record.get("PREVIOUS_INSPECTOR_EMAIL", "") or "—"),
+    }
+    latest_date = str(record.get("LAST_INSPECTION_DATE", "") or "")
+    latest_year = int(_coerce_float(str(latest_date)[:4], AS_OF_YEAR))
+    rows = [
+        {
+            "YEAR": latest_year,
+            "CONDITION": int(_coerce_float(record.get("REPORTED_LAST_MIN_COND"), 0)),
+            "METHOD": str(record.get("LAST_INSPECTION_METHOD", "Visual Only") or "Visual Only"),
+            "INSPECTOR_NAME": current_identity["name"],
+            "INSPECTOR_ID": current_identity["id"],
+            "INSPECTOR_DESIGNATION": current_identity["designation"],
+            "INSPECTOR_RANK": current_identity["rank"],
+            "INSPECTOR_PHONE": current_identity["phone"],
+            "INSPECTOR_EMAIL": current_identity["email"],
+            "RECORD_TYPE": "Latest / current",
+        },
+        {
+            "YEAR": max(latest_year - 2, 1990),
+            "CONDITION": int(_coerce_float(record.get("REPORTED_LAST_MIN_COND"), 0)) + 1,
+            "METHOD": "Visual Only",
+            "INSPECTOR_NAME": previous_identity["name"],
+            "INSPECTOR_ID": previous_identity["id"],
+            "INSPECTOR_DESIGNATION": previous_identity["designation"],
+            "INSPECTOR_RANK": previous_identity["rank"],
+            "INSPECTOR_PHONE": previous_identity["phone"],
+            "INSPECTOR_EMAIL": previous_identity["email"],
+            "RECORD_TYPE": "Previous",
+        },
+    ]
+    return pd.DataFrame.from_records(rows, columns=columns)
+
+
+def explain_bridge(
+    bridge_row: Mapping[str, Any],
+    ledger_row: Mapping[str, Any],
+    audit_row: Mapping[str, Any],
+    climate_summary: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    """Build the auditable, physics-linked reasons behind one bridge's flag."""
+
+    evidence: list[dict[str, str]] = []
+
+    claimed = _coerce_float(audit_row.get("REPORTED_LAST_MIN_COND", ledger_row.get("REPORTED_LAST_MIN_COND")), np.nan)
+    physics = _coerce_float(audit_row.get("PHYSICS_EXPECTED_CONDITION"), np.nan)
+    gap = _coerce_float(audit_row.get("CONDITION_GAP"), np.nan)
+    if np.isfinite(claimed) and np.isfinite(physics) and np.isfinite(gap):
+        severity = "critical" if gap >= 3.0 else "material" if gap >= 1.5 else "minor"
+        evidence.append(
+            {
+                "factor": "Claimed rating versus physics-implied rating",
+                "evidence": (
+                    f"Claimed {claimed:.0f}/9 while the survival model implies "
+                    f"{physics:.2f}/9 over the five-year horizon (gap {gap:+.2f})."
+                ),
+                "impact": severity,
+            }
+        )
+
+    survival = _coerce_float(audit_row.get("EXPECTED_SURVIVAL"), np.nan)
+    if np.isfinite(survival):
+        evidence.append(
+            {
+                "factor": "Five-year conditional survival",
+                "evidence": (
+                    f"Model-implied five-year survival is {survival:.3f}, against the "
+                    f"{SURVIVAL_THRESHOLD:.2f} audit threshold."
+                ),
+                "impact": "critical" if survival < SURVIVAL_THRESHOLD else "within threshold",
+            }
+        )
+
+    z_score = _coerce_float(audit_row.get("AUDIT_Z_SCORE"), np.nan)
+    if np.isfinite(z_score) and abs(z_score) > 0:
+        evidence.append(
+            {
+                "factor": "Robust Audit Z-score",
+                "evidence": f"Standardised residual of {z_score:+.2f} on claimed-vs-implied deterioration.",
+                "impact": "outlier" if abs(z_score) >= 2.0 else "inlier",
+            }
+        )
+
+    if bool(_coerce_bool(audit_row.get("ISOLATION_FLAG"), False)):
+        anomaly = _coerce_float(audit_row.get("ISOLATION_ANOMALY_SCORE"), np.nan)
+        evidence.append(
+            {
+                "factor": "IsolationForest multivariate anomaly",
+                "evidence": (
+                    f"Feature vector flagged as an anomaly (score {anomaly:.3f}) against the "
+                    "audited portfolio baseline."
+                ),
+                "impact": "outlier",
+            }
+        )
+
+    floods = _coerce_float(climate_summary.get("CUMULATIVE_FLOOD_EXCEEDANCES"), np.nan)
+    scour = _coerce_float(climate_summary.get("MAX_SCOUR_INDEX"), np.nan)
+    anomaly_mean = _coerce_float(climate_summary.get("MEAN_MONSOON_ANOMALY"), np.nan)
+    cyclones = _coerce_float(climate_summary.get("CYCLONE_YEARS"), np.nan)
+    if np.isfinite(floods):
+        evidence.append(
+            {
+                "factor": "Cumulative flood exceedances since construction",
+                "evidence": f"{floods:.0f} monsoon seasons exceeded the district flood threshold.",
+                "impact": "high hydraulic load" if floods >= 8 else "moderate hydraulic load",
+            }
+        )
+    if np.isfinite(scour):
+        evidence.append(
+            {
+                "factor": "Peak scour index",
+                "evidence": f"Maximum annual scour index reached {scour:.2f} at this district.",
+                "impact": "critical scour" if scour >= 10.0 else "observed scour",
+            }
+        )
+    if np.isfinite(anomaly_mean):
+        evidence.append(
+            {
+                "factor": "Long-run monsoon anomaly",
+                "evidence": f"Mean standardised monsoon anomaly since construction is {anomaly_mean:+.2f}.",
+                "impact": "wet regime" if anomaly_mean >= 0.35 else "near-normal regime",
+            }
+        )
+    if np.isfinite(cyclones) and cyclones > 0:
+        evidence.append(
+            {
+                "factor": "Cyclone exposure",
+                "evidence": f"{cyclones:.0f} cyclone-flagged years recorded in the district.",
+                "impact": "shock exposure",
+            }
+        )
+
+    age = _coerce_float(bridge_row.get("YEAR_BUILT"), np.nan)
+    if np.isfinite(age):
+        age_years = max(AS_OF_YEAR - int(age), 0)
+        evidence.append(
+            {
+                "factor": "Structural vintage",
+                "evidence": (
+                    f"Built in {int(age)} ({age_years} years old), "
+                    f"{bridge_row.get('STRUCTURE_KIND_MATERIAL', 'unknown')} "
+                    f"{bridge_row.get('STRUCTURE_TYPE_DESIGN', 'structure')}."
+                ),
+                "impact": "aged asset" if age_years >= 40 else "within design life",
+            }
+        )
+
+    waterway = _coerce_float(bridge_row.get("WATERWAY_ADEQUACY"), np.nan)
+    if np.isfinite(waterway):
+        evidence.append(
+            {
+                "factor": "Waterway adequacy",
+                "evidence": f"Recorded waterway adequacy is {waterway:.0f}/9 for the design discharge.",
+                "impact": "under-sized waterway" if waterway <= 4 else "adequate waterway",
+            }
+        )
+
+    method = str(ledger_row.get("LAST_INSPECTION_METHOD", "") or "").lower()
+    if "visual" in method and "ndt" not in method:
+        evidence.append(
+            {
+                "factor": "Inspection modality",
+                "evidence": "The latest submission is visual-only; no NDT evidence supports the rating.",
+                "impact": "unverified claim",
+            }
+        )
+
+    return evidence
 
 
 # ---------------------------------------------------------------------------

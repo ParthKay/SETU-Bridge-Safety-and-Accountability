@@ -7,6 +7,12 @@ services:
     container_name: zero-trust-bridge-survival
     ports:
       - "8501:8501"
+    volumes:
+      - ./app.py:/app/app.py
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./artifacts:/app/artifacts
+      - ./.streamlit:/app/.streamlit
     restart: unless-stopped
     environment:
       STREAMLIT_SERVER_HEADLESS: "true"

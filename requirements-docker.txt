@@ -12,3 +12,5 @@ matplotlib==3.11.2
 pyarrow==19.0.1
 numba==0.68.1
 llvmlite==0.50.0
+beautifulsoup4==4.12.3
+reportlab==4.2.5
